@@ -316,7 +316,7 @@ export default function Admin() {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Loyalty Pool: paid member count</label>
+              <label className="text-xs text-muted-foreground mb-1 block">Loyalty reward members (paid punch cards)</label>
               <Input
                 type="number"
                 placeholder={prizeConfig?.loyaltyParticipantCount?.toString() || '0'}
@@ -325,10 +325,10 @@ export default function Admin() {
                 className="bg-background border-border"
               />
               <p className="text-[11px] text-muted-foreground mt-1">
-                {loyaltyCount || prizeConfig?.loyaltyParticipantCount || 0} members × $53 ÷ 2 = <strong className="text-gold">${((parseInt(loyaltyCount || prizeConfig?.loyaltyParticipantCount || 0) * 53) / 2).toFixed(2)}</strong>
+                Budget estimate: {loyaltyCount || prizeConfig?.loyaltyParticipantCount || 0} members × avg $53 visit value ÷ 2 = <strong className="text-gold">${((parseInt(loyaltyCount || prizeConfig?.loyaltyParticipantCount || 0) * 53) / 2).toFixed(2)}</strong> suggested prize budget
               </p>
             </div>
-            <p className="text-[11px] text-muted-foreground">Tip: use the Loyalty tab to track payments — the count updates automatically when you mark members as paid.</p>
+            <p className="text-[11px] text-muted-foreground">The Loyalty tab auto-updates this count when you confirm members. Use this tab to set the actual gift card amounts you'll award.</p>
             <Button onClick={() => savePrizes.mutate()} disabled={savePrizes.isPending} className="w-full bg-gold text-black border-0 font-semibold">
               Save
             </Button>
