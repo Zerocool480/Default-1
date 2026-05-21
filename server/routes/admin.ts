@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express'
 import { db } from '../../db/index.js'
-import { qrCodes, users, punchCards, loyaltyParticipants, prizeConfig, leagueSettings } from '../../db/schema.js'
+import { qrCodes, users, punchCards, prizeConfig, leagueSettings } from '../../db/schema.js'
 import { eq, desc } from 'drizzle-orm'
-import { requireAdmin, type AuthRequest } from '../middleware/auth.js'
+import { requireAdmin, requireAuth, type AuthRequest } from '../middleware/auth.js'
 import crypto from 'crypto'
 import QRCode from 'qrcode'
+import jwt from 'jsonwebtoken'
 
 const router = Router()
 
@@ -14,13 +15,28 @@ function addDays(date: Date, days: number): Date {
   return result
 }
 
-// Verify admin passcode (separate from JWT admin flag — for the hidden tap unlock)
-router.post('/verify-passcode', (req: Request, res: Response) => {
+// Verify admin passcode — upgrades the current user to admin and issues a new JWT
+router.post('/verify-passcode', requireAuth, async (req: AuthRequest, res: Response) => {
   const { passcode } = req.body
-  if (passcode === process.env.ADMIN_PASSCODE) {
-    res.json({ valid: true })
-  } else {
+  if (passcode !== process.env.ADMIN_PASSCODE) {
     res.status(403).json({ valid: false, error: 'Invalid passcode' })
+    return
+  }
+  try {
+    await db.update(users).set({ isAdmin: true }).where(eq(users.id, req.userId!))
+    const [user] = await db.select().from(users).where(eq(users.id, req.userId!)).limit(1)
+    const token = jwt.sign(
+      { userId: user.id, isAdmin: true },
+      process.env.JWT_SECRET!,
+      { expiresIn: '30d' }
+    )
+    res.json({
+      valid: true,
+      token,
+      user: { id: user.id, username: user.username, email: user.email, isAdmin: true, sleeperUsername: user.sleeperUsername, loyaltyEligible: user.loyaltyEligible },
+    })
+  } catch {
+    res.status(500).json({ valid: false, error: 'Failed to grant admin access' })
   }
 })
 

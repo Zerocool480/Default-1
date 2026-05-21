@@ -9,6 +9,7 @@ import Leaderboard from '@/pages/Leaderboard'
 import LoyaltyLeaderboard from '@/pages/LoyaltyLeaderboard'
 import Admin from '@/pages/Admin'
 import BottomNav from '@/components/BottomNav'
+import Toaster from '@/components/Toaster'
 
 const queryClient = new QueryClient()
 
@@ -38,6 +39,7 @@ function AppRoutes() {
           </Routes>
           {auth.user && <BottomNav />}
         </div>
+        <Toaster />
       </BrowserRouter>
     </AuthContext.Provider>
   )
