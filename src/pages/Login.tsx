@@ -65,6 +65,11 @@ export default function Login() {
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </Button>
+          <p className="text-center">
+            <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground">
+              Forgot password?
+            </Link>
+          </p>
         </form>
 
         <p className="text-center text-sm text-muted-foreground">

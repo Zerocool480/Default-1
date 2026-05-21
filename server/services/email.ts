@@ -59,3 +59,32 @@ export async function sendLineupReminder(emails: string[], week: number, appUrl:
 
   return { sent, skipped: false }
 }
+
+export async function sendPasswordReset(toEmail: string, resetUrl: string): Promise<{ sent: boolean; skipped: boolean }> {
+  const transport = createTransport()
+  if (!transport) {
+    console.log(`[email] SMTP not configured — password reset link for ${toEmail}: ${resetUrl}`)
+    return { sent: false, skipped: true }
+  }
+
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER
+  await transport.sendMail({
+    from: `Great Awakening Fantasy League <${from}>`,
+    to: toEmail,
+    subject: 'Reset your GAFL password',
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#0a0a0a;color:#f0f0f0;padding:24px;border-radius:12px">
+        <h2 style="color:#D4AF37;margin:0 0 8px">Great Awakening Fantasy League</h2>
+        <p style="color:#888;margin:0 0 20px;font-size:14px">Password Reset</p>
+        <p style="margin:0 0 16px">Click the button below to set a new password. This link expires in 1 hour and can only be used once.</p>
+        <a href="${resetUrl}" style="display:inline-block;background:#D4AF37;color:#000;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;margin-bottom:20px">
+          Reset Password
+        </a>
+        <p style="font-size:12px;color:#555;margin:0 0 8px">If you didn't request this, ignore this email — your password won't change.</p>
+        <p style="font-size:11px;color:#444;margin:0;word-break:break-all">${resetUrl}</p>
+      </div>
+    `,
+  })
+
+  return { sent: true, skipped: false }
+}

@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthContext, useAuthState } from '@/hooks/useAuth'
 import Login from '@/pages/Login'
 import Register from '@/pages/Register'
+import ForgotPassword from '@/pages/ForgotPassword'
+import ResetPassword from '@/pages/ResetPassword'
 import Dashboard from '@/pages/Dashboard'
 import PunchCard from '@/pages/PunchCard'
 import Leaderboard from '@/pages/Leaderboard'
@@ -33,6 +35,8 @@ function AppRoutes() {
           <Routes>
             <Route path="/login" element={!auth.user ? <Login /> : <Navigate to="/" />} />
             <Route path="/register" element={!auth.user ? <Register /> : <Navigate to="/" />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/" element={auth.user ? <Dashboard /> : <Navigate to="/login" />} />
             <Route path="/punchcard" element={auth.user ? <PunchCard /> : <Navigate to="/login" />} />
             <Route path="/leaderboard" element={auth.user ? <Leaderboard /> : <Navigate to="/login" />} />

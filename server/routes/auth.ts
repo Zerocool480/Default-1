@@ -1,8 +1,9 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import crypto from 'crypto'
 import { db } from '../../db/index.js'
-import { users, punchCards } from '../../db/schema.js'
+import { users, punchCards, passwordResetTokens } from '../../db/schema.js'
 import { eq, count } from 'drizzle-orm'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 
@@ -105,6 +106,67 @@ router.put('/profile', requireAuth, async (req: AuthRequest, res) => {
     res.json(makeUserPayload(user))
   } catch {
     res.status(500).json({ error: 'Failed to update profile' })
+  }
+})
+
+// POST /auth/forgot-password — generates a reset token and emails it
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body
+  // Always respond with success to avoid leaking whether an email exists
+  res.json({ message: 'If that email is registered, a reset link has been sent.' })
+
+  try {
+    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1)
+    if (!user) return
+
+    const token = crypto.randomBytes(32).toString('hex')
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+
+    await db.insert(passwordResetTokens).values({ userId: user.id, token, expiresAt })
+
+    const appUrl = process.env.APP_URL || 'http://localhost:5173'
+    const resetUrl = `${appUrl}/reset-password?token=${token}`
+
+    const { sendPasswordReset } = await import('../services/email.js')
+    await sendPasswordReset(user.email, resetUrl)
+  } catch (err) {
+    console.error('Forgot password error:', err)
+  }
+})
+
+// POST /auth/reset-password — validates token and sets new password
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body
+    if (!token || !newPassword || newPassword.length < 6) {
+      res.status(400).json({ error: 'Token and a password of at least 6 characters are required' })
+      return
+    }
+
+    const [record] = await db.select().from(passwordResetTokens)
+      .where(eq(passwordResetTokens.token, token)).limit(1)
+
+    if (!record) {
+      res.status(400).json({ error: 'Invalid or expired reset link' })
+      return
+    }
+    if (record.usedAt) {
+      res.status(400).json({ error: 'This reset link has already been used' })
+      return
+    }
+    if (new Date() > record.expiresAt) {
+      res.status(400).json({ error: 'This reset link has expired — please request a new one' })
+      return
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12)
+    await db.update(users).set({ passwordHash }).where(eq(users.id, record.userId))
+    await db.update(passwordResetTokens).set({ usedAt: new Date() }).where(eq(passwordResetTokens.id, record.id))
+
+    res.json({ message: 'Password updated — you can now sign in.' })
+  } catch (err) {
+    console.error('Reset password error:', err)
+    res.status(500).json({ error: 'Failed to reset password' })
   }
 })
 

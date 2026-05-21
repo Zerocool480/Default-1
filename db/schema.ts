@@ -128,9 +128,19 @@ export const weekStatus = pgTable('week_status', {
   scoresFinalized: boolean('scores_finalized').default(false).notNull(),
 }, t => [unique().on(t.week, t.season)])
 
+export const passwordResetTokens = pgTable('password_reset_tokens', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull(),
+  token: text('token').notNull().unique(),
+  expiresAt: timestamp('expires_at').notNull(),
+  usedAt: timestamp('used_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
 export type NflPlayer = typeof nflPlayers.$inferSelect
 export type WeeklyLineup = typeof weeklyLineups.$inferSelect
 export type LineupSlot = typeof lineupSlots.$inferSelect
 export type PlayerWeeklyScore = typeof playerWeeklyScores.$inferSelect
 export type UsedPlayer = typeof usedPlayers.$inferSelect
 export type WeekStatus = typeof weekStatus.$inferSelect
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect
