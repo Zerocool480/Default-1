@@ -7,6 +7,7 @@ import authRoutes from './routes/auth.js'
 import punchcardRoutes from './routes/punchcard.js'
 import fantasyRoutes from './routes/fantasy.js'
 import adminRoutes from './routes/admin.js'
+import publicRoutes from './routes/public.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -19,6 +20,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/punchcard', punchcardRoutes)
 app.use('/api/fantasy', fantasyRoutes)
 app.use('/api/admin', adminRoutes)
+app.use('/api/public', publicRoutes)
 
 // Serve built frontend in production
 if (process.env.NODE_ENV === 'production') {

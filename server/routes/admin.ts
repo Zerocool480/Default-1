@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { db } from '../../db/index.js'
-import { qrCodes, users, punchCards, prizeConfig, leagueSettings } from '../../db/schema.js'
-import { eq, desc } from 'drizzle-orm'
+import { qrCodes, users, punchCards, prizeConfig, leagueSettings, loyaltyParticipants } from '../../db/schema.js'
+import { eq, desc, count } from 'drizzle-orm'
 import { requireAdmin, requireAuth, type AuthRequest } from '../middleware/auth.js'
 import crypto from 'crypto'
 import QRCode from 'qrcode'
@@ -168,6 +168,75 @@ router.get('/users', requireAdmin, async (_req, res) => {
     res.json(result)
   } catch {
     res.status(500).json({ error: 'Failed to get users' })
+  }
+})
+
+// Admin overview stats
+router.get('/overview', requireAdmin, async (_req, res) => {
+  try {
+    const [memberRow] = await db.select({ count: count() }).from(users)
+    const [loyaltyEligRow] = await db.select({ count: count() }).from(users).where(eq(users.loyaltyEligible, true))
+    const [loyaltyPaidRow] = await db.select({ count: count() }).from(loyaltyParticipants).where(eq(loyaltyParticipants.hasPaid, true))
+    const [activeQr] = await db.select().from(qrCodes).where(eq(qrCodes.isActive, true)).orderBy(desc(qrCodes.createdAt)).limit(1)
+    const [config] = await db.select().from(prizeConfig).limit(1)
+
+    res.json({
+      memberCount: Number(memberRow.count),
+      maxMembers: 525,
+      loyaltyEligibleCount: Number(loyaltyEligRow.count),
+      loyaltyPaidCount: Number(loyaltyPaidRow.count),
+      activeQr: activeQr || null,
+      freeLeagueBudget: config?.freeLeagueBudget || '0',
+      loyaltyPool: ((config?.loyaltyParticipantCount || 0) * 53 / 2).toFixed(2),
+    })
+  } catch {
+    res.status(500).json({ error: 'Failed to get overview' })
+  }
+})
+
+// Loyalty participant management
+router.get('/loyalty', requireAdmin, async (_req, res) => {
+  try {
+    const eligible = await db.select({
+      id: users.id,
+      username: users.username,
+      email: users.email,
+      sleeperUsername: users.sleeperUsername,
+    }).from(users).where(eq(users.loyaltyEligible, true))
+
+    const participants = await db.select().from(loyaltyParticipants)
+    const participantMap = new Map(participants.map(p => [p.userId, p]))
+
+    res.json(eligible.map(u => ({
+      ...u,
+      inPool: participantMap.has(u.id),
+      hasPaid: participantMap.get(u.id)?.hasPaid || false,
+      confirmedAt: participantMap.get(u.id)?.confirmedAt || null,
+    })))
+  } catch {
+    res.status(500).json({ error: 'Failed to get loyalty participants' })
+  }
+})
+
+router.post('/loyalty/:userId/confirm', requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const userId = parseInt(req.params.userId)
+    const { hasPaid } = req.body
+    const existing = await db.select().from(loyaltyParticipants).where(eq(loyaltyParticipants.userId, userId)).limit(1)
+    if (existing.length > 0) {
+      await db.update(loyaltyParticipants).set({ hasPaid: !!hasPaid }).where(eq(loyaltyParticipants.userId, userId))
+    } else {
+      await db.insert(loyaltyParticipants).values({ userId, hasPaid: !!hasPaid })
+    }
+    // Keep prizeConfig loyaltyParticipantCount in sync with paid count
+    const [{ count: paidCount }] = await db.select({ count: count() }).from(loyaltyParticipants).where(eq(loyaltyParticipants.hasPaid, true))
+    const [existing2] = await db.select().from(prizeConfig).limit(1)
+    if (existing2) {
+      await db.update(prizeConfig).set({ loyaltyParticipantCount: Number(paidCount), updatedAt: new Date() }).where(eq(prizeConfig.id, existing2.id))
+    }
+    res.json({ success: true })
+  } catch {
+    res.status(500).json({ error: 'Failed to update loyalty participant' })
   }
 })
 
