@@ -1,33 +1,12 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { api } from '@/lib/api'
-import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, User, LogOut } from 'lucide-react'
 
 export default function Profile() {
-  const { user, login, logout } = useAuth()
+  const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const [sleeperUsername, setSleeperUsername] = useState(user?.sleeperUsername || '')
-  const [saving, setSaving] = useState(false)
-
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    try {
-      const updated = await api.put<any>('/auth/profile', { sleeperUsername })
-      const token = localStorage.getItem('gafl_token')!
-      login(token, updated)
-      toast({ title: 'Profile updated', variant: 'success' })
-    } catch (err: any) {
-      toast({ title: err.message || 'Failed to save', variant: 'destructive' })
-    } finally {
-      setSaving(false)
-    }
-  }
 
   function handleLogout() {
     logout()
@@ -58,37 +37,14 @@ export default function Profile() {
             <p className="text-xs text-muted-foreground mb-1">Email</p>
             <p className="text-sm font-medium">{user?.email}</p>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border bg-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground font-normal uppercase tracking-wider">
-            Fantasy
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSave} className="space-y-3">
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">Sleeper Username</label>
-              <Input
-                placeholder="Your Sleeper display name"
-                value={sleeperUsername}
-                onChange={e => setSleeperUsername(e.target.value)}
-                className="bg-background border-border"
-              />
-              <p className="text-[11px] text-muted-foreground mt-1.5">
-                Must match exactly — this links your account to the Sleeper league standings.
-              </p>
-            </div>
-            <Button
-              type="submit"
-              disabled={saving}
-              className="w-full bg-gold text-black border-0 font-semibold"
-            >
-              {saving ? 'Saving…' : 'Save Changes'}
-            </Button>
-          </form>
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Loyalty status</p>
+            <p className="text-sm font-medium">
+              {user?.loyaltyEligible
+                ? <span className="text-gold">Eligible ✓</span>
+                : 'Complete 10 taproom visits to qualify'}
+            </p>
+          </div>
         </CardContent>
       </Card>
 

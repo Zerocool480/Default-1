@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { QrCode, Download, RefreshCw, Users, Settings, Trophy, BarChart3, Star, Check, X } from 'lucide-react'
+import { QrCode, Download, RefreshCw, Users, Trophy, BarChart3, Star, Check, X, Lock, Zap, Mail } from 'lucide-react'
 import { getCurrentNflWeek } from '@/lib/nfl'
 import { cn } from '@/lib/utils'
 
@@ -43,10 +43,10 @@ interface Overview {
 const tabs = [
   { id: 'overview', label: 'Overview', icon: BarChart3 },
   { id: 'qr', label: 'QR Codes', icon: QrCode },
+  { id: 'fantasy', label: 'Fantasy', icon: Trophy },
   { id: 'loyalty', label: 'Loyalty', icon: Star },
   { id: 'prizes', label: 'Prizes', icon: Trophy },
   { id: 'members', label: 'Members', icon: Users },
-  { id: 'league', label: 'League', icon: Settings },
 ] as const
 
 type TabId = typeof tabs[number]['id']
@@ -58,7 +58,13 @@ export default function Admin() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [budget, setBudget] = useState('')
   const [loyaltyCount, setLoyaltyCount] = useState('')
-  const [sleeperLeagueId, setSleeperLeagueId] = useState('')
+  const [syncWeek, setSyncWeek] = useState(String(getCurrentNflWeek() || 1))
+  const [overrideSearch, setOverrideSearch] = useState('')
+  const [overridePlayerId, setOverridePlayerId] = useState<number | null>(null)
+  const [overridePlayerName, setOverridePlayerName] = useState('')
+  const [overrideWeek, setOverrideWeek] = useState(String(getCurrentNflWeek() || 1))
+  const [overridePoints, setOverridePoints] = useState('')
+  const [reminderWeek, setReminderWeek] = useState(String(getCurrentNflWeek() || 1))
 
   const { data: overview, isLoading: overviewLoading } = useQuery<Overview>({
     queryKey: ['admin-overview'],
@@ -83,10 +89,22 @@ export default function Admin() {
     enabled: activeTab === 'prizes',
   })
 
-  const { data: leagueSettings } = useQuery<any>({
-    queryKey: ['admin-league-settings'],
-    queryFn: () => api.get('/admin/league-settings'),
-    enabled: activeTab === 'league',
+  const { data: weekStatuses = [], refetch: refetchWeekStatuses } = useQuery<any[]>({
+    queryKey: ['admin-week-statuses'],
+    queryFn: () => api.get('/admin/fantasy/weeks'),
+    enabled: activeTab === 'fantasy',
+  })
+
+  const { data: playerCounts = [] } = useQuery<{ position: string; count: string }[]>({
+    queryKey: ['admin-player-counts'],
+    queryFn: () => api.get('/admin/fantasy/player-counts'),
+    enabled: activeTab === 'fantasy',
+  })
+
+  const { data: overrideSearchResults = [] } = useQuery<{ id: number; name: string; position: string; team: string }[]>({
+    queryKey: ['player-search', overrideSearch],
+    queryFn: () => api.get(`/fantasy/players?search=${encodeURIComponent(overrideSearch)}`),
+    enabled: overrideSearch.length >= 2 && activeTab === 'fantasy',
   })
 
   const generateQR = useMutation({
@@ -108,20 +126,67 @@ export default function Admin() {
     onError: (err: any) => toast({ title: err.message, variant: 'destructive' }),
   })
 
-  const saveLeague = useMutation({
-    mutationFn: () => api.put('/admin/league-settings', { sleeperLeagueId, season: 2026 }),
-    onSuccess: () => {
-      toast({ title: 'League ID saved', variant: 'success' })
-      queryClient.invalidateQueries({ queryKey: ['admin-league-settings'] })
-    },
-    onError: (err: any) => toast({ title: err.message, variant: 'destructive' }),
-  })
-
   const confirmLoyalty = useMutation({
     mutationFn: ({ userId, hasPaid }: { userId: number; hasPaid: boolean }) =>
       api.post(`/admin/loyalty/${userId}/confirm`, { hasPaid }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-loyalty', 'admin-overview', 'public-stats'] })
+    },
+    onError: (err: any) => toast({ title: err.message, variant: 'destructive' }),
+  })
+
+  const syncPlayers = useMutation({
+    mutationFn: () => api.post('/admin/fantasy/sync-players', {}),
+    onSuccess: (data: any) => {
+      toast({ title: `Synced ${data.synced} players from ESPN`, variant: 'success' })
+      queryClient.invalidateQueries({ queryKey: ['admin-player-counts'] })
+    },
+    onError: (err: any) => toast({ title: err.message, variant: 'destructive' }),
+  })
+
+  const syncScores = useMutation({
+    mutationFn: (week: number) => api.post(`/admin/fantasy/sync-scores/${week}`, {}),
+    onSuccess: (data: any) => {
+      toast({ title: `Updated scores for ${data.updated} players`, variant: 'success' })
+      refetchWeekStatuses()
+    },
+    onError: (err: any) => toast({ title: err.message, variant: 'destructive' }),
+  })
+
+  const lockWeek = useMutation({
+    mutationFn: (week: number) => api.post(`/admin/fantasy/lock/${week}`, {}),
+    onSuccess: (data: any) => {
+      toast({ title: `Week locked — ${data.lineupCount} lineups recorded`, variant: 'success' })
+      refetchWeekStatuses()
+    },
+    onError: (err: any) => toast({ title: err.message, variant: 'destructive' }),
+  })
+
+  const overrideScore = useMutation({
+    mutationFn: () => api.put('/admin/fantasy/score', {
+      playerId: overridePlayerId,
+      week: parseInt(overrideWeek),
+      season: 2026,
+      fantasyPoints: parseFloat(overridePoints),
+    }),
+    onSuccess: () => {
+      toast({ title: 'Score updated', variant: 'success' })
+      setOverridePlayerId(null)
+      setOverridePlayerName('')
+      setOverrideSearch('')
+      setOverridePoints('')
+    },
+    onError: (err: any) => toast({ title: err.message, variant: 'destructive' }),
+  })
+
+  const sendReminder = useMutation({
+    mutationFn: (week: number) => api.post('/admin/send-reminder', { week }),
+    onSuccess: (data: any) => {
+      if (data.skipped) {
+        toast({ title: 'SMTP not configured — set SMTP_HOST, SMTP_USER, SMTP_PASS in env to send real emails', variant: 'default' })
+      } else {
+        toast({ title: `Reminder sent to ${data.sent} members`, variant: 'success' })
+      }
     },
     onError: (err: any) => toast({ title: err.message, variant: 'destructive' }),
   })
@@ -278,7 +343,7 @@ export default function Admin() {
             <div key={m.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border bg-card">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{m.username}</p>
-                <p className="text-xs text-muted-foreground truncate">{m.sleeperUsername || m.email}</p>
+                <p className="text-xs text-muted-foreground truncate">{m.email}</p>
               </div>
               <button
                 onClick={() => confirmLoyalty.mutate({ userId: m.id, hasPaid: !m.hasPaid })}
@@ -363,28 +428,192 @@ export default function Admin() {
         </div>
       )}
 
-      {/* League */}
-      {activeTab === 'league' && (
-        <Card className="border-border bg-card">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Sleeper League</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Sleeper League ID</label>
-              <Input
-                placeholder={leagueSettings?.sleeperLeagueId || 'From your Sleeper league URL'}
-                value={sleeperLeagueId}
-                onChange={e => setSleeperLeagueId(e.target.value)}
-                className="bg-background border-border font-mono text-sm"
-              />
-              <p className="text-[11px] text-muted-foreground mt-1">sleeper.com/leagues/<strong>{'<this-number>'}</strong>/…</p>
-            </div>
-            <Button onClick={() => saveLeague.mutate()} disabled={saveLeague.isPending || !sleeperLeagueId} className="w-full bg-gold text-black border-0 font-semibold">
-              Save League ID
-            </Button>
-          </CardContent>
-        </Card>
+      {/* Fantasy Management */}
+      {activeTab === 'fantasy' && (
+        <div className="space-y-4">
+
+          {/* Player Pool */}
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Player Pool</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-4 gap-2 text-center">
+                {['QB', 'RB', 'WR', 'TE'].map(pos => {
+                  const c = playerCounts.find(p => p.position === pos)
+                  return (
+                    <div key={pos} className="bg-background rounded-lg py-2">
+                      <p className="text-[10px] text-muted-foreground">{pos}</p>
+                      <p className="text-lg font-bold text-gold">{c ? c.count : '—'}</p>
+                    </div>
+                  )
+                })}
+              </div>
+              <Button
+                onClick={() => syncPlayers.mutate()}
+                disabled={syncPlayers.isPending}
+                className="w-full bg-gold text-black border-0 font-semibold"
+              >
+                <RefreshCw className={cn('h-4 w-4 mr-2', syncPlayers.isPending && 'animate-spin')} />
+                {syncPlayers.isPending ? 'Syncing from ESPN…' : 'Sync Players from ESPN'}
+              </Button>
+              <p className="text-[11px] text-muted-foreground">Pulls active QB/RB/WR/TE rosters. Run once before the season, then weekly for roster moves.</p>
+            </CardContent>
+          </Card>
+
+          {/* Week Management */}
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Week Management</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground block">Week number</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={18}
+                  value={syncWeek}
+                  onChange={e => setSyncWeek(e.target.value)}
+                  className="bg-background border-border"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  onClick={() => lockWeek.mutate(parseInt(syncWeek))}
+                  disabled={lockWeek.isPending || !syncWeek}
+                  variant="outline"
+                  className="border-yellow-600/40 text-yellow-500 hover:bg-yellow-600/10 text-xs"
+                >
+                  <Lock className="h-3.5 w-3.5 mr-1.5" />
+                  {lockWeek.isPending ? 'Locking…' : 'Lock Week'}
+                </Button>
+                <Button
+                  onClick={() => syncScores.mutate(parseInt(syncWeek))}
+                  disabled={syncScores.isPending || !syncWeek}
+                  className="bg-gold text-black border-0 text-xs font-semibold"
+                >
+                  <Zap className={cn('h-3.5 w-3.5 mr-1.5', syncScores.isPending && 'animate-spin')} />
+                  {syncScores.isPending ? 'Syncing…' : 'Sync Scores'}
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">Lock before Thursday kickoff. Sync scores during/after Sunday games — run multiple times.</p>
+
+              {weekStatuses.length > 0 && (
+                <div className="space-y-1 pt-1">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Week Status</p>
+                  {weekStatuses.map((ws: any) => (
+                    <div key={ws.week} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded bg-background">
+                      <span className="text-muted-foreground w-14">Week {ws.week}</span>
+                      <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-medium', ws.is_locked ? 'bg-yellow-600/20 text-yellow-400' : 'bg-green-600/20 text-green-400')}>
+                        {ws.is_locked ? 'Locked' : 'Open'}
+                      </span>
+                      {ws.scores_finalized && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-600/20 text-blue-400">Scored</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Score Override */}
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Score Override</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground block">Search player</label>
+                <Input
+                  placeholder="Player name…"
+                  value={overrideSearch}
+                  onChange={e => { setOverrideSearch(e.target.value); setOverridePlayerId(null); setOverridePlayerName('') }}
+                  className="bg-background border-border"
+                />
+              </div>
+              {overrideSearch.length >= 2 && !overridePlayerId && overrideSearchResults.length > 0 && (
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {overrideSearchResults.slice(0, 8).map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => { setOverridePlayerId(p.id); setOverridePlayerName(p.name); setOverrideSearch(p.name) }}
+                      className="w-full text-left px-3 py-2 rounded-lg bg-background hover:bg-card border border-border text-sm flex items-center justify-between"
+                    >
+                      <span>{p.name}</span>
+                      <span className="text-xs text-muted-foreground">{p.position} · {p.team}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {overridePlayerId && (
+                <p className="text-xs text-gold">Selected: {overridePlayerName}</p>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Week</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={18}
+                    value={overrideWeek}
+                    onChange={e => setOverrideWeek(e.target.value)}
+                    className="bg-background border-border"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Fantasy pts</label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g. 24.5"
+                    value={overridePoints}
+                    onChange={e => setOverridePoints(e.target.value)}
+                    className="bg-background border-border"
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={() => overrideScore.mutate()}
+                disabled={overrideScore.isPending || !overridePlayerId || !overridePoints}
+                className="w-full bg-gold text-black border-0 font-semibold"
+              >
+                {overrideScore.isPending ? 'Saving…' : 'Override Score'}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Email Reminders */}
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Lineup Reminder Email</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Week</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={18}
+                  value={reminderWeek}
+                  onChange={e => setReminderWeek(e.target.value)}
+                  className="bg-background border-border"
+                />
+              </div>
+              <Button
+                onClick={() => sendReminder.mutate(parseInt(reminderWeek))}
+                disabled={sendReminder.isPending || !reminderWeek}
+                variant="outline"
+                className="w-full border-gold/40 text-gold hover:bg-gold/10"
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                {sendReminder.isPending ? 'Sending…' : `Send Week ${reminderWeek} Reminder to All Members`}
+              </Button>
+              <p className="text-[11px] text-muted-foreground">Configure SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM in your environment variables to enable real emails. Without them, this logs to the server console.</p>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   )

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
@@ -7,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import PunchCardDisplay from '@/components/PunchCardDisplay'
 import PrizePoolCard from '@/components/PrizePoolCard'
 import { getCurrentNflWeek, getSegmentForWeek, getSeasonStatus } from '@/lib/nfl'
-import { Trophy, Star, Users, Beer, ChevronRight } from 'lucide-react'
+import { Trophy, Star, Users, Beer, ChevronRight, X } from 'lucide-react'
 
 interface PublicStats {
   freeLeagueBudget: string
@@ -27,6 +28,8 @@ interface StandingRow {
   seg2: number
   seg3: number
 }
+
+const ONBOARDING_KEY = 'gafl_onboarding_dismissed'
 
 export default function Dashboard() {
   const { user, logout } = useAuth()
@@ -52,6 +55,15 @@ export default function Dashboard() {
   const sortedStandings = [...(standings || [])].sort((a, b) => b.overall - a.overall)
   const myStanding = sortedStandings.find(s => s.userId === user?.id)
   const rank = myStanding ? sortedStandings.indexOf(myStanding) + 1 : null
+
+  const [onboardingDismissed, setOnboardingDismissed] = useState(
+    () => localStorage.getItem(ONBOARDING_KEY) === '1'
+  )
+  function dismissOnboarding() {
+    localStorage.setItem(ONBOARDING_KEY, '1')
+    setOnboardingDismissed(true)
+  }
+  const showOnboarding = !onboardingDismissed && !myStanding
 
   return (
     <div className="pb-24 px-4 pt-5 space-y-5 max-w-lg mx-auto">
@@ -102,6 +114,31 @@ export default function Dashboard() {
           }
         </div>
       </div>
+
+      {/* Onboarding card — shown until first lineup is submitted */}
+      {showOnboarding && (
+        <div className="relative rounded-xl border border-gold/30 bg-gold/5 px-4 py-3.5 space-y-2">
+          <button
+            onClick={dismissOnboarding}
+            className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <p className="text-sm font-semibold text-gold pr-6">How to play</p>
+          <ul className="text-xs text-muted-foreground space-y-1.5">
+            <li>🏈 Pick 7 players each week — QB, RB×2, WR×2, TE, FLEX</li>
+            <li>🔒 Use a player once per segment, then they're locked until next segment</li>
+            <li>📊 Highest points wins each segment + the overall season</li>
+            <li>🍺 Scan the taproom QR code weekly to earn loyalty rewards</li>
+          </ul>
+          <Link
+            to="/lineup"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-gold mt-1"
+          >
+            Set your Week {currentWeek ?? 1} lineup <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      )}
 
       {/* Punch Card */}
       <div>

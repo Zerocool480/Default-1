@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
-import { Lock, Plus, X, Search, Trophy, ChevronRight, RefreshCw } from 'lucide-react'
+import { Lock, Plus, X, Search, Trophy, ChevronRight, RefreshCw, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Link } from 'react-router-dom'
 
@@ -147,6 +147,48 @@ export default function Lineup() {
   const isLocked = lineupData?.isLocked || false
   const assignedIds = new Set(lineup.filter(Boolean).map(p => p!.id))
 
+  const weekTotal = lineupData?.slots?.reduce(
+    (sum, s) => sum + (s.fantasyPoints ? parseFloat(s.fantasyPoints) : 0), 0
+  ) ?? 0
+
+  const [quickFilling, setQuickFilling] = useState(false)
+  async function handleQuickFill() {
+    setQuickFilling(true)
+    try {
+      const available = await api.get<Record<string, { id: number; name: string; position: string; team: string }[]>>(
+        `/fantasy/available?week=${week}`
+      )
+      const newLineup = [...lineup]
+      const taken = new Set(newLineup.filter(Boolean).map(p => p!.id))
+      const pools: Record<string, typeof available['QB']> = {
+        QB: [...(available.QB || [])],
+        RB: [...(available.RB || [])],
+        WR: [...(available.WR || [])],
+        TE: [...(available.TE || [])],
+      }
+      for (let i = 0; i < SLOT_DEFS.length; i++) {
+        if (newLineup[i]) continue
+        const def = SLOT_DEFS[i]
+        const positions = def.slotType === 'FLEX' ? ['RB', 'WR', 'TE'] : [def.slotType]
+        for (const pos of positions) {
+          const pool = pools[pos] || []
+          const pick = pool.find(p => !taken.has(p.id))
+          if (pick) {
+            newLineup[i] = pick
+            taken.add(pick.id)
+            pools[pos] = pool.filter(p => p.id !== pick.id)
+            break
+          }
+        }
+      }
+      setLineup(newLineup)
+    } catch {
+      toast({ title: 'Could not load available players', variant: 'destructive' })
+    } finally {
+      setQuickFilling(false)
+    }
+  }
+
   if (seasonStatus === 'preseason') {
     return (
       <div className="pb-24 px-4 pt-6 space-y-4 max-w-lg mx-auto">
@@ -170,7 +212,10 @@ export default function Lineup() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gold">Week {week} Lineup</h1>
-          <p className="text-xs text-muted-foreground">Segment {segment} · Half-PPR · 7 skill positions</p>
+          <p className="text-xs text-muted-foreground">
+            Segment {segment} · Half-PPR
+            {weekTotal > 0 && <span className="text-gold font-semibold"> · {weekTotal.toFixed(1)} pts</span>}
+          </p>
         </div>
         <div className="flex flex-col items-end gap-1">
           <Link to="/leaderboard" className="text-xs text-muted-foreground flex items-center gap-0.5 hover:text-foreground">
@@ -246,13 +291,24 @@ export default function Lineup() {
       </div>
 
       {!isLocked && (
-        <Button
-          className="w-full bg-gold text-black font-semibold border-0"
-          onClick={handleSave}
-          disabled={saveMutation.isPending || lineup.some(p => p === null)}
-        >
-          {saveMutation.isPending ? 'Saving…' : 'Save Lineup'}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="border-gold/40 text-gold hover:bg-gold/10 shrink-0"
+            onClick={handleQuickFill}
+            disabled={quickFilling || lineup.every(p => p !== null)}
+            title="Auto-fill empty slots with top available players"
+          >
+            <Zap className={cn('h-4 w-4', quickFilling && 'animate-spin')} />
+          </Button>
+          <Button
+            className="flex-1 bg-gold text-black font-semibold border-0"
+            onClick={handleSave}
+            disabled={saveMutation.isPending || lineup.some(p => p === null)}
+          >
+            {saveMutation.isPending ? 'Saving…' : 'Save Lineup'}
+          </Button>
+        </div>
       )}
 
       {/* Used players reference */}

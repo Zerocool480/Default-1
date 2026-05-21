@@ -376,4 +376,41 @@ router.get('/fantasy/weeks', requireAdmin, async (_req, res) => {
   }
 })
 
+// Send lineup reminder emails to all members
+router.post('/send-reminder', requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { week } = req.body
+    const { sendLineupReminder } = await import('../services/email.js')
+
+    const allUsers = await db.select({ email: users.email }).from(users)
+    const emails = allUsers.map(u => u.email)
+
+    const appUrl = process.env.APP_URL || 'https://your-app.replit.app'
+    const result = await sendLineupReminder(emails, week, appUrl)
+
+    res.json({ success: true, ...result })
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: err.message || 'Failed to send reminders' })
+  }
+})
+
+// Get player counts by position (for admin Fantasy tab)
+router.get('/fantasy/player-counts', requireAdmin, async (_req, res) => {
+  try {
+    const { nflPlayers: np } = await import('../../db/schema.js')
+    const { sql } = await import('drizzle-orm')
+    const counts = await db.execute(sql`
+      SELECT position, COUNT(*) as count
+      FROM nfl_players
+      WHERE is_active = true
+      GROUP BY position
+      ORDER BY position
+    `)
+    res.json(counts.rows)
+  } catch {
+    res.status(500).json({ error: 'Failed to get player counts' })
+  }
+})
+
 export default router

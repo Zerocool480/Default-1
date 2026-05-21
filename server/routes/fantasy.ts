@@ -10,6 +10,14 @@ import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 const router = Router()
 
 const SEASON = 2026
+
+// Week 1 of the 2026 season kicks off Sep 9 at 8:15pm ET
+// Each week's lineup lock is 7 days apart from that anchor
+function getWeekLockTime(week: number): Date {
+  const anchor = new Date('2026-09-09T20:15:00-04:00')
+  anchor.setDate(anchor.getDate() + (week - 1) * 7)
+  return anchor
+}
 const SEGMENT_WEEKS: Record<number, number[]> = {
   1: [1, 2, 3, 4, 5, 6],
   2: [7, 8, 9, 10, 11, 12],
@@ -112,11 +120,15 @@ router.put('/lineup/:week', requireAuth, async (req: AuthRequest, res) => {
       return
     }
 
-    // Check week is not locked
+    // Check week is not locked (manual lock or time-based lock)
     const [ws] = await db.select().from(weekStatus)
       .where(and(eq(weekStatus.week, week), eq(weekStatus.season, SEASON))).limit(1)
     if (ws?.isLocked) {
       res.status(400).json({ error: 'This week is locked' })
+      return
+    }
+    if (new Date() >= getWeekLockTime(week)) {
+      res.status(400).json({ error: `Week ${week} lineups are locked — games have started` })
       return
     }
 
@@ -288,6 +300,48 @@ router.get('/standings', requireAuth, async (_req, res) => {
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Failed to fetch standings' })
+  }
+})
+
+// GET /fantasy/available?week=7
+// Returns top available players by position for quick-fill
+// "Available" = not used in current segment by this user, sorted by last-week score desc
+router.get('/available', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const week = parseInt(req.query.week as string) || 1
+    const userId = req.userId!
+    const segment = getSegmentForWeek(week)
+    const prevWeek = week - 1
+
+    // Players used by this user this segment
+    const used = await db.select({ playerId: usedPlayers.playerId })
+      .from(usedPlayers)
+      .where(and(eq(usedPlayers.userId, userId), eq(usedPlayers.segmentNumber, segment), eq(usedPlayers.season, SEASON)))
+    const usedIds = used.map(u => u.playerId)
+
+    const result: Record<string, any[]> = { QB: [], RB: [], WR: [], TE: [] }
+
+    for (const pos of ['QB', 'RB', 'WR', 'TE'] as const) {
+      const candidates = await db.execute(sql`
+        SELECT
+          p.id, p.name, p.position, p.team,
+          COALESCE(s.fantasy_points::numeric, 0) as last_score
+        FROM nfl_players p
+        LEFT JOIN player_weekly_scores s
+          ON s.player_id = p.id AND s.week = ${prevWeek} AND s.season = ${SEASON}
+        WHERE p.position = ${pos}
+          AND p.is_active = true
+          ${usedIds.length > 0 ? sql`AND p.id NOT IN (${sql.join(usedIds.map(id => sql`${id}`), sql`, `)})` : sql``}
+        ORDER BY last_score DESC, p.name ASC
+        LIMIT 10
+      `)
+      result[pos] = candidates.rows
+    }
+
+    res.json(result)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Failed to fetch available players' })
   }
 })
 
