@@ -1,12 +1,13 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Home, QrCode, Trophy, Star, Settings } from 'lucide-react'
+import { Home, QrCode, ClipboardList, BarChart2, Star, Settings } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { to: '/', icon: Home, label: 'Home' },
   { to: '/punchcard', icon: QrCode, label: 'Punch Card' },
-  { to: '/leaderboard', icon: Trophy, label: 'League' },
+  { to: '/lineup', icon: ClipboardList, label: 'Lineup' },
+  { to: '/leaderboard', icon: BarChart2, label: 'Standings' },
   { to: '/loyalty', icon: Star, label: 'Loyalty' },
 ]
 

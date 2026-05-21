@@ -19,6 +19,15 @@ interface PublicStats {
   spotsRemaining: number
 }
 
+interface StandingRow {
+  userId: number
+  username: string
+  overall: number
+  seg1: number
+  seg2: number
+  seg3: number
+}
+
 export default function Dashboard() {
   const { user, logout } = useAuth()
   const currentWeek = getCurrentNflWeek()
@@ -37,13 +46,12 @@ export default function Dashboard() {
 
   const { data: standings } = useQuery({
     queryKey: ['standings'],
-    queryFn: () => api.get<{ configured: boolean; standings: any[] }>('/fantasy/standings'),
+    queryFn: () => api.get<StandingRow[]>('/fantasy/standings'),
   })
 
-  const myStanding = standings?.standings?.find(
-    s => s.displayName?.toLowerCase() === user?.sleeperUsername?.toLowerCase()
-  )
-  const rank = myStanding ? standings!.standings!.indexOf(myStanding) + 1 : null
+  const sortedStandings = [...(standings || [])].sort((a, b) => b.overall - a.overall)
+  const myStanding = sortedStandings.find(s => s.userId === user?.id)
+  const rank = myStanding ? sortedStandings.indexOf(myStanding) + 1 : null
 
   return (
     <div className="pb-24 px-4 pt-5 space-y-5 max-w-lg mx-auto">
@@ -113,29 +121,22 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 gap-3">
         <Card className="border-border bg-card">
           <CardContent className="pt-4 pb-4">
-            {!standings?.configured ? (
-              <div className="text-center">
-                <Trophy className="h-6 w-6 mx-auto text-gold/20 mb-1" />
-                <p className="text-[10px] text-muted-foreground">League pending</p>
-              </div>
-            ) : rank ? (
+            {rank ? (
               <>
                 <p className="text-xs text-muted-foreground">Your rank</p>
                 <p className="text-3xl font-bold text-gold">#{rank}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {myStanding?.wins}W – {myStanding?.losses}L
+                  {myStanding?.overall.toFixed(1)} pts overall
                 </p>
               </>
             ) : (
-              <>
-                <p className="text-xs text-muted-foreground">Fantasy rank</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {user?.sleeperUsername
-                    ? 'Not on standings yet'
-                    : <Link to="/profile" className="text-gold underline-offset-2 underline">Add Sleeper name</Link>
-                  }
-                </p>
-              </>
+              <div className="text-center">
+                <Trophy className="h-6 w-6 mx-auto text-gold/20 mb-1" />
+                <p className="text-[10px] text-muted-foreground">No lineups yet</p>
+                <Link to="/lineup" className="text-[10px] text-gold underline-offset-2 underline">
+                  Set lineup
+                </Link>
+              </div>
             )}
           </CardContent>
         </Card>

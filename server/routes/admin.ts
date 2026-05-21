@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { db } from '../../db/index.js'
-import { qrCodes, users, punchCards, prizeConfig, leagueSettings, loyaltyParticipants } from '../../db/schema.js'
-import { eq, desc, count } from 'drizzle-orm'
+import { qrCodes, users, punchCards, prizeConfig, leagueSettings, loyaltyParticipants, weekStatus, weeklyLineups, lineupSlots, usedPlayers, nflPlayers, playerWeeklyScores } from '../../db/schema.js'
+import { eq, desc, count, and, sql } from 'drizzle-orm'
 import { requireAdmin, requireAuth, type AuthRequest } from '../middleware/auth.js'
 import crypto from 'crypto'
 import QRCode from 'qrcode'
@@ -266,6 +266,113 @@ router.get('/export/users', requireAdmin, async (_req, res) => {
     res.send(csv)
   } catch {
     res.status(500).json({ error: 'Export failed' })
+  }
+})
+
+// Fantasy management routes
+
+router.post('/fantasy/sync-players', requireAdmin, async (_req, res) => {
+  try {
+    const { syncPlayers } = await import('../services/espn.js')
+    const count = await syncPlayers()
+    res.json({ success: true, synced: count })
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: err.message || 'Sync failed' })
+  }
+})
+
+router.post('/fantasy/sync-scores/:week', requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const week = parseInt(req.params.week)
+    const season = 2026
+    const { syncWeekScores } = await import('../services/espn.js')
+    const updated = await syncWeekScores(week, season)
+    res.json({ success: true, updated })
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: err.message || 'Score sync failed' })
+  }
+})
+
+router.put('/fantasy/score', requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { playerId, week, season = 2026, fantasyPoints } = req.body
+
+    await db.insert(playerWeeklyScores).values({
+      playerId, week, season,
+      fantasyPoints: String(fantasyPoints),
+      isFinal: true,
+    }).onConflictDoUpdate({
+      target: [playerWeeklyScores.playerId, playerWeeklyScores.week, playerWeeklyScores.season],
+      set: { fantasyPoints: String(fantasyPoints), isFinal: true },
+    })
+
+    // Update lineup slot scores
+    await db.execute(sql`
+      UPDATE lineup_slots
+      SET fantasy_points = ${String(fantasyPoints)}
+      FROM weekly_lineups
+      WHERE lineup_slots.lineup_id = weekly_lineups.id
+        AND lineup_slots.player_id = ${playerId}
+        AND weekly_lineups.week = ${week}
+        AND weekly_lineups.season = ${season}
+    `)
+
+    res.json({ success: true })
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: err.message || 'Override failed' })
+  }
+})
+
+router.post('/fantasy/lock/:week', requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const week = parseInt(req.params.week)
+    const season = 2026
+    const segment = week <= 6 ? 1 : week <= 12 ? 2 : 3
+
+    // Lock or create week status
+    const [existing] = await db.select().from(weekStatus)
+      .where(and(eq(weekStatus.week, week), eq(weekStatus.season, season))).limit(1)
+    if (existing) {
+      await db.update(weekStatus).set({ isLocked: true }).where(eq(weekStatus.id, existing.id))
+    } else {
+      await db.insert(weekStatus).values({ week, season, isLocked: true })
+    }
+
+    // Lock all lineups for this week and record used players
+    const lineups = await db.select().from(weeklyLineups)
+      .where(and(eq(weeklyLineups.week, week), eq(weeklyLineups.season, season)))
+
+    for (const lineup of lineups) {
+      await db.update(weeklyLineups).set({ isLocked: true }).where(eq(weeklyLineups.id, lineup.id))
+
+      const slots = await db.select({ playerId: lineupSlots.playerId }).from(lineupSlots).where(eq(lineupSlots.lineupId, lineup.id))
+      for (const slot of slots) {
+        await db.insert(usedPlayers).values({
+          userId: lineup.userId,
+          playerId: slot.playerId,
+          segmentNumber: segment,
+          season,
+          week,
+        }).onConflictDoNothing()
+      }
+    }
+
+    res.json({ success: true, lineupCount: lineups.length })
+  } catch (err: any) {
+    console.error(err)
+    res.status(500).json({ error: err.message || 'Lock failed' })
+  }
+})
+
+router.get('/fantasy/weeks', requireAdmin, async (_req, res) => {
+  try {
+    const statuses = await db.select().from(weekStatus).where(eq(weekStatus.season, 2026)).orderBy(weekStatus.week)
+    res.json(statuses)
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get week statuses' })
   }
 })
 

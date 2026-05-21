@@ -1,21 +1,5 @@
-export interface SleeperStanding {
-  rosterId: number
-  ownerId: string
-  displayName: string
-  avatar: string | null
-  wins: number
-  losses: number
-  ties: number
-  pointsFor: number
-  pointsAgainst: number
-}
-
-// Season segment definitions (NFL 2026)
-export const SEGMENTS = [
-  { number: 1, label: 'Segment 1', weeks: [1, 2, 3, 4, 5, 6], startDate: 'Sep 9', endDate: 'Oct 12' },
-  { number: 2, label: 'Segment 2', weeks: [7, 8, 9, 10, 11, 12], startDate: 'Oct 13', endDate: 'Nov 16' },
-  { number: 3, label: 'Segment 3', weeks: [13, 14, 15, 16, 17, 18], startDate: 'Nov 17', endDate: 'Jan 10' },
-]
+export { SEGMENTS } from './segments'
+import { SEGMENTS } from './segments'
 
 export function getPrizeBreakdown(budget: number) {
   const segmentBudget = budget * 0.40

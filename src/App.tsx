@@ -9,6 +9,7 @@ import Leaderboard from '@/pages/Leaderboard'
 import LoyaltyLeaderboard from '@/pages/LoyaltyLeaderboard'
 import Admin from '@/pages/Admin'
 import Profile from '@/pages/Profile'
+import Lineup from '@/pages/Lineup'
 import BottomNav from '@/components/BottomNav'
 import Toaster from '@/components/Toaster'
 
@@ -35,6 +36,7 @@ function AppRoutes() {
             <Route path="/" element={auth.user ? <Dashboard /> : <Navigate to="/login" />} />
             <Route path="/punchcard" element={auth.user ? <PunchCard /> : <Navigate to="/login" />} />
             <Route path="/leaderboard" element={auth.user ? <Leaderboard /> : <Navigate to="/login" />} />
+            <Route path="/lineup" element={auth.user ? <Lineup /> : <Navigate to="/login" />} />
             <Route path="/loyalty" element={auth.user ? <LoyaltyLeaderboard /> : <Navigate to="/login" />} />
             <Route path="/admin" element={auth.user?.isAdmin ? <Admin /> : <Navigate to="/" />} />
             <Route path="/profile" element={auth.user ? <Profile /> : <Navigate to="/login" />} />
