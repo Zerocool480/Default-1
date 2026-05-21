@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent } from '@/components/ui/card'
-import { Trophy } from 'lucide-react'
+import { Trophy, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SEGMENTS } from '@/lib/segments'
 import { Link } from 'react-router-dom'
@@ -24,13 +24,22 @@ const TABS = [
   { key: 'seg3', label: 'Seg 3' },
 ]
 
+function timeAgo(ms: number): string {
+  const secs = Math.floor((Date.now() - ms) / 1000)
+  if (secs < 60) return 'just now'
+  const mins = Math.floor(secs / 60)
+  if (mins < 60) return `${mins}m ago`
+  return `${Math.floor(mins / 60)}h ago`
+}
+
 export default function Leaderboard() {
   const { user } = useAuth()
   const [tab, setTab] = useState<'overall' | 'seg1' | 'seg2' | 'seg3'>('overall')
 
-  const { data: standings, isLoading } = useQuery({
+  const { data: standings, isLoading, isFetching, refetch, dataUpdatedAt } = useQuery({
     queryKey: ['standings'],
     queryFn: () => api.get<StandingRow[]>('/fantasy/standings'),
+    refetchInterval: 5 * 60 * 1000,
   })
 
   const sorted = [...(standings || [])].sort((a, b) => b[tab] - a[tab])
@@ -42,7 +51,17 @@ export default function Leaderboard() {
           <h1 className="text-xl font-bold text-gold">Standings</h1>
           <p className="text-xs text-muted-foreground">2026 Season · Half-PPR</p>
         </div>
-        <Link to="/lineup" className="text-xs text-gold hover:underline">Set Lineup →</Link>
+        <div className="flex flex-col items-end gap-1">
+          <Link to="/lineup" className="text-xs text-gold hover:underline">Set Lineup →</Link>
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-40"
+          >
+            <RefreshCw className={cn('h-3 w-3', isFetching && 'animate-spin')} />
+            {dataUpdatedAt ? timeAgo(dataUpdatedAt) : ''}
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-2 overflow-x-auto no-scrollbar">

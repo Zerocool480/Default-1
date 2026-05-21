@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
-import { Lock, Plus, X, Search, Trophy, ChevronRight } from 'lucide-react'
+import { Lock, Plus, X, Search, Trophy, ChevronRight, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Link } from 'react-router-dom'
 
@@ -45,6 +45,14 @@ interface LineupSlotData {
   fantasyPoints: string | null
 }
 
+function timeAgo(ms: number): string {
+  const secs = Math.floor((Date.now() - ms) / 1000)
+  if (secs < 60) return 'just now'
+  const mins = Math.floor(secs / 60)
+  if (mins < 60) return `${mins}m ago`
+  return `${Math.floor(mins / 60)}h ago`
+}
+
 export default function Lineup() {
   const qc = useQueryClient()
   const week = getCurrentNflWeek() ?? 1
@@ -57,9 +65,10 @@ export default function Lineup() {
   const [search, setSearch] = useState('')
   const [initialized, setInitialized] = useState(false)
 
-  const { data: lineupData } = useQuery({
+  const { data: lineupData, isFetching: lineupFetching, refetch: refetchLineup, dataUpdatedAt } = useQuery({
     queryKey: ['lineup', week],
     queryFn: () => api.get<{ lineup: any; slots: LineupSlotData[]; isLocked: boolean }>(`/fantasy/lineup/${week}`),
+    refetchInterval: 5 * 60 * 1000,
     onSuccess(data: { lineup: any; slots: LineupSlotData[]; isLocked: boolean }) {
       if (!initialized && data.slots?.length > 0) {
         const filledSlots = [...data.slots]
@@ -163,9 +172,19 @@ export default function Lineup() {
           <h1 className="text-xl font-bold text-gold">Week {week} Lineup</h1>
           <p className="text-xs text-muted-foreground">Segment {segment} · Half-PPR · 7 skill positions</p>
         </div>
-        <Link to="/leaderboard" className="text-xs text-muted-foreground flex items-center gap-0.5 hover:text-foreground">
-          Standings <ChevronRight className="h-3.5 w-3.5" />
-        </Link>
+        <div className="flex flex-col items-end gap-1">
+          <Link to="/leaderboard" className="text-xs text-muted-foreground flex items-center gap-0.5 hover:text-foreground">
+            Standings <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+          <button
+            onClick={() => refetchLineup()}
+            disabled={lineupFetching}
+            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-40"
+          >
+            <RefreshCw className={cn('h-3 w-3', lineupFetching && 'animate-spin')} />
+            {dataUpdatedAt ? timeAgo(dataUpdatedAt) : ''}
+          </button>
+        </div>
       </div>
 
       {isLocked && (
