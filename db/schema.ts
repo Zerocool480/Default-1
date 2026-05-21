@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp, numeric } from 'drizzle-orm/pg-core'
+import { pgTable, serial, text, integer, boolean, timestamp, numeric, unique } from 'drizzle-orm/pg-core'
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -65,3 +65,72 @@ export type QrCode = typeof qrCodes.$inferSelect
 export type PunchCardScan = typeof punchCardScans.$inferSelect
 export type LoyaltyParticipant = typeof loyaltyParticipants.$inferSelect
 export type PrizeConfig = typeof prizeConfig.$inferSelect
+
+export const nflPlayers = pgTable('nfl_players', {
+  id: serial('id').primaryKey(),
+  espnId: text('espn_id').notNull().unique(),
+  name: text('name').notNull(),
+  position: text('position').notNull(), // QB, RB, WR, TE
+  team: text('team').notNull().default('FA'),
+  isActive: boolean('is_active').default(true).notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+export const weeklyLineups = pgTable('weekly_lineups', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull(),
+  week: integer('week').notNull(),
+  season: integer('season').notNull(),
+  isLocked: boolean('is_locked').default(false).notNull(),
+  submittedAt: timestamp('submitted_at').defaultNow().notNull(),
+}, t => [unique().on(t.userId, t.week, t.season)])
+
+export const lineupSlots = pgTable('lineup_slots', {
+  id: serial('id').primaryKey(),
+  lineupId: integer('lineup_id').references(() => weeklyLineups.id).notNull(),
+  playerId: integer('player_id').references(() => nflPlayers.id).notNull(),
+  slotType: text('slot_type').notNull(), // QB, RB, WR, TE, FLEX
+  fantasyPoints: numeric('fantasy_points', { precision: 6, scale: 2 }),
+})
+
+export const playerWeeklyScores = pgTable('player_weekly_scores', {
+  id: serial('id').primaryKey(),
+  playerId: integer('player_id').references(() => nflPlayers.id).notNull(),
+  week: integer('week').notNull(),
+  season: integer('season').notNull(),
+  fantasyPoints: numeric('fantasy_points', { precision: 6, scale: 2 }).default('0').notNull(),
+  passingYards: integer('passing_yards').default(0),
+  passingTDs: integer('passing_tds').default(0),
+  interceptions: integer('interceptions').default(0),
+  rushingYards: integer('rushing_yards').default(0),
+  rushingTDs: integer('rushing_tds').default(0),
+  receptions: integer('receptions').default(0),
+  receivingYards: integer('receiving_yards').default(0),
+  receivingTDs: integer('receiving_tds').default(0),
+  fumblesLost: integer('fumbles_lost').default(0),
+  isFinal: boolean('is_final').default(false).notNull(),
+}, t => [unique().on(t.playerId, t.week, t.season)])
+
+export const usedPlayers = pgTable('used_players', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull(),
+  playerId: integer('player_id').references(() => nflPlayers.id).notNull(),
+  segmentNumber: integer('segment_number').notNull(),
+  season: integer('season').notNull(),
+  week: integer('week').notNull(),
+}, t => [unique().on(t.userId, t.playerId, t.segmentNumber, t.season)])
+
+export const weekStatus = pgTable('week_status', {
+  id: serial('id').primaryKey(),
+  week: integer('week').notNull(),
+  season: integer('season').notNull(),
+  isLocked: boolean('is_locked').default(false).notNull(),
+  scoresFinalized: boolean('scores_finalized').default(false).notNull(),
+}, t => [unique().on(t.week, t.season)])
+
+export type NflPlayer = typeof nflPlayers.$inferSelect
+export type WeeklyLineup = typeof weeklyLineups.$inferSelect
+export type LineupSlot = typeof lineupSlots.$inferSelect
+export type PlayerWeeklyScore = typeof playerWeeklyScores.$inferSelect
+export type UsedPlayer = typeof usedPlayers.$inferSelect
+export type WeekStatus = typeof weekStatus.$inferSelect
