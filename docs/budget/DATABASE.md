@@ -17,11 +17,20 @@ users ─┬─ plaid_items ──── accounts ──── transactions ─�
        ├─ category_rules            ← learned from user corrections
        ├─ recurring_streams         ← detected bills/subscriptions/income
        ├─ budgets (category limits, monthly)
-       ├─ goals ── goal_contributions
+       ├─ goals ─┬─ goal_contributions
+       │         └─ goal_eta_history        ← Goal GPS arrival-date trail
        ├─ engine_snapshots          ← every Safe-to-Spend computation
+       ├─ score_snapshots           ← daily Financial Health Score + reasons
+       ├─ briefings                 ← each morning's briefing, as delivered
+       ├─ forecast_checks           ← forecast-vs-actual accuracy telemetry
+       ├─ copilot_conversations ── copilot_messages
        ├─ insights                  ← active nudges
        └─ user_settings             ← emergency floor, payday, timezone
 plaid_webhook_events                ← raw webhook audit log
+
+(The cash-flow forecast itself is NOT stored as rows — it is recomputed on demand
+from streams/liabilities/balances (pure function, ADR-1/ADR-7); only its accuracy
+checks and the artifacts derived from it (ETAs, briefing warnings) persist.)
 ```
 
 ---
@@ -93,6 +102,7 @@ plaid_webhook_events                ← raw webhook audit log
 | category_source | text | `rule` \| `plaid` \| `ai` \| `user` \| `none` |
 | plaid_pfc_primary / plaid_pfc_detailed | text | Plaid's own categorization, kept |
 | is_pending | boolean | pending counts against Safe-to-Spend immediately |
+| source | text default 'plaid' | `plaid` \| `manual` \| `planned` — "I bought it" simulator entries are `planned` and reconciled (merged) when the matching synced txn arrives |
 | is_recurring | boolean + recurring_stream_id uuid → recurring_streams | |
 | exclude_from_engine | boolean default false | transfers, reimbursements |
 | raw | jsonb | full Plaid payload for reprocessing |
@@ -195,6 +205,68 @@ unique `(plaid_transaction_id)`.
 
 Index: `(user_id, for_date desc, computed_at desc)` — dashboard reads latest row.
 
+### score_snapshots  (Financial Health Score, PRD §8)
+| column | type | notes |
+|---|---|---|
+| id | uuid PK | |
+| user_id | uuid → users | |
+| for_date | date | one per day (+ material-change recomputes) |
+| total | int | 0–100 composite |
+| sub_scores | jsonb | `{cash_flow: {score, weight, reasons[]}, emergency_fund: …}` — 8 pillars, each with its reasons list |
+| delta_reasons | jsonb | attribution vs. previous snapshot ("Visa utilization crossed 30%") |
+| computed_at | timestamptz | |
+
+Index: `(user_id, for_date desc)`.
+
+### goal_eta_history  (Goal GPS trail, PRD §6)
+| column | type | notes |
+|---|---|---|
+| id | uuid PK | |
+| goal_id | uuid → goals | |
+| computed_at | timestamptz | |
+| eta_date | date | estimated arrival date at this moment |
+| percent_complete | numeric(5,2) | |
+| trigger | text | what moved it (`sync` \| `txn` \| `contribution` \| `settings`) |
+
+The ETA-over-time sparkline (the most motivating chart in the app) reads this table.
+Material moves (>2 days) also emit an `insights` row.
+
+### briefings  (Daily Briefing, PRD §5 — stored exactly as delivered)
+| column | type | notes |
+|---|---|---|
+| id | uuid PK | |
+| user_id | uuid → users | |
+| for_date | date | unique `(user_id, for_date)` |
+| health_score | int | denormalized from that morning's snapshot |
+| safe_to_spend | numeric(14,2) | |
+| checking_total / upcoming_bills_total | numeric(14,2) | |
+| goals_status | text | `on_track` \| `attention` \| `off_track` |
+| recommendation_code | text | rule-tree leaf id (`spend_freely`, `tight_before_payday`, …) |
+| recommendation_text | text | as shown (template or AI-phrased) |
+| recommendation_reasons | jsonb | the facts behind it |
+| delivered_via | text[] | `in_app`, `email`, `push` |
+| read_at | timestamptz | briefing read-rate is the north-star metric |
+
+### copilot_conversations / copilot_messages
+| copilot_conversations | id uuid PK · user_id · title text · created_at / updated_at |
+|---|---|
+
+| column (copilot_messages) | type | notes |
+|---|---|---|
+| id | uuid PK | |
+| conversation_id | uuid → copilot_conversations | |
+| role | text | `user` \| `assistant` |
+| content | text | rendered text |
+| tool_calls | jsonb | tools invoked + their results — the grounding audit trail (ADR-6): every figure in `content` must trace to a row here |
+| model / tokens_in / tokens_out | text / int / int | cost telemetry |
+| created_at | timestamptz | |
+
+### forecast_checks  (honesty telemetry, PRD §11)
+| id uuid PK · user_id · made_on date · horizon_days int (1 \| 7 \| 30) · predicted_balance numeric(14,2) · actual_balance numeric(14,2) · abs_error_pct numeric(6,2) · checked_at timestamptz |
+
+Nightly job compares past projections against reality; the accuracy chart in Settings
+keeps the forecast (and everything built on it) honest.
+
 ### insights
 | id uuid PK · user_id · type text (`budget_pace` \| `price_increase` \| `duplicate_charge` \| `goal_tradeoff` …) · title text · body text · severity text · data jsonb · status text (`active`\|`dismissed`\|`expired`) · created_at / expires_at |
 
@@ -216,6 +288,19 @@ emergencyFloor  = user_settings.emergency_floor
 period_end      = MIN(next_expected_date) of confirmed inflow streams, else month end
 spentToday      = Σ today's txns in discretionary categories (incl. pending, incl. credit)
 ```
+
+Other intelligence services read the same tables — no private copies of the data:
+
+- **Forecast:** confirmed `recurring_streams` (both directions) + `liabilities` due
+  dates + `planned` transactions + trailing-90-day discretionary median from
+  `transactions` → daily series (computed on demand, not stored).
+- **Score:** aggregates over `transactions`, `accounts`, `liabilities`, `goals`,
+  `engine_snapshots` (allowance adherence), and `budgets`.
+- **Goal GPS:** `goals` + forecast surplus → `goal_eta_history`.
+- **Subscription manager:** `recurring_streams` (outflow, non-essential) with monthly/
+  annual cost derived from `average_amount` × `frequency`, last-charged date from the
+  newest linked transaction, and price-change flags from `last_amount` vs.
+  `average_amount` — a view over existing tables, no new ones.
 
 The trickiest correctness problem in the whole system is the **"already paid" join**:
 a rent bill due the 1st and the rent transaction that posted on the 1st must not both

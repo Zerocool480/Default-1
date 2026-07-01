@@ -1,158 +1,106 @@
-# UX Design — Screens, Flows, and Voice
+# UX Design — Navigation, Flows, and Voice
 
-**Status:** Draft for review
+**Status:** Draft v0.2 (financial-OS scope) · Wireframes in `WIREFRAMES.md`
 
-Design stance: **calm, confident, coaching.** One number, generous whitespace, no wall
-of charts. The app should feel like a level-headed friend who's good with money, not a
-trading terminal and not a guilt machine.
-
----
-
-## 1. Information architecture
-
-```
-┌─ Today (default screen — THE number)
-├─ Activity        (transactions, review queue)
-├─ Plan            (budgets · goals · recurring/bills)
-├─ Simulate        (purchase & savings what-ifs)
-└─ Settings        (accounts/connections, floor, payday, profile)
-```
-
-Five destinations, bottom tab bar on mobile / left rail on desktop. Responsive PWA,
-mobile-first layouts — the "can I afford this?" moment happens standing in a store.
+Design stance: **calm, confident, coaching.** The interface surfaces the most important
+thing first and explains why — never a wall of charts. It should feel like a
+level-headed friend who's good with money: not a trading terminal, not a guilt machine.
 
 ---
 
-## 2. Screen: Today (the product)
+## 1. Navigation
 
 ```
-┌─────────────────────────────────────────┐
-│  Tuesday, July 1        data as of 7:42a│
-│                                         │
-│         Safe to Spend Today             │
-│                                         │
-│              $47.20                     │  ← huge. the whole point.
-│                                         │
-│   ▁▁▂ spent $12.80 of $60 today ▂▁▁    │  ← subtle progress, not a gauge
-│                                         │
-│   ▾ Why this number?                    │
-│   ┌───────────────────────────────────┐ │
-│   │ Checking available      $2,310.00 │ │
-│   │ Bills before Jul 15 ──── −$980.00 │ │
-│   │ Visa payment due Jul 10  −$250.00 │ │
-│   │ Vacation goal (July)     −$150.00 │ │
-│   │ Emergency floor          −$500.00 │ │
-│   │ ─────────────────────────────────  │ │
-│   │ $430 left ÷ 9 days to payday      │ │
-│   └───────────────────────────────────┘ │
-│                                         │
-│   Next 7 days ▂▃▂▅▂▂▇  (Fri: rent)     │
-│                                         │
-│   ◦ Restaurants at 70% with 12 days    │
-│     left — pace: $6/day keeps you under.│
-│                                    [✕]  │
-└─────────────────────────────────────────┘
+┌─ Today        — Daily Briefing + Safe to Spend (default screen)
+├─ Copilot      — chat: ask anything about your money
+├─ Plan         — Goals (GPS) · Budgets · Recurring & Subscriptions · Calendar/Forecast
+├─ Activity     — transactions, review queue
+└─ Settings     — connections, floor, payday, AI & notifications, profile
 ```
 
-Rules for this screen:
+Five tabs (bottom bar on mobile, left rail on desktop). Two cross-cutting entry points
+float above the tabs:
 
-- The number renders in **<1s** from the latest snapshot; recompute happens in the
-  background and animates in if it changed.
-- **Color = state, used sparingly.** Comfortable (default ink), tight (amber), $0/recovery
-  (calm red — with a recovery plan, never just a red zero).
-- "Why this number?" is one tap, always available, always matches the snapshot exactly.
-- Max 2 insight cards. Dismissible. Forward-looking phrasing only.
-- Data age always visible; tap to force refresh.
-- If the pool is $0/negative: headline becomes **"Hold off today"** + "You're $86 short
-  for the next 9 days. Skipping $10/day gets you back on track by Friday." Coach, not shame.
+- **"Can I afford this?"** — a prominent action button (FAB on mobile) available from
+  anywhere; opens Purchase Intelligence. This is the standing-in-a-store moment and
+  must never be more than one tap away.
+- **Simulate** — reachable from Copilot ("what if…"), from Plan (goal sliders), and
+  from Purchase Intelligence ("see full impact").
 
----
+Responsive PWA, mobile-first, dark mode from day one.
 
-## 3. Screen: Activity
+## 2. Screen inventory (wireframes in WIREFRAMES.md)
 
-- Reverse-chronological transactions, grouped by day, with daily discretionary subtotal
-  ("Mon · $38.20 of $60").
-- Pending transactions shown ghosted with a `pending` chip — visibly already counted.
-- Tap a transaction → detail sheet: change category (typeahead), toggle
-  "always categorize [Merchant] like this" (writes a rule), exclude from engine
-  (transfer/reimbursement), link to a bill/stream.
-- **Review queue** pinned at top when non-empty: "3 transactions need a category."
-  Clearing it is a 10-second daily ritual, and it's the engine's data-quality valve.
+| Screen | Job | Leads with |
+|---|---|---|
+| **Today** | The daily answer + briefing | Safe to Spend number; briefing card; health score chip; "why?" expanders |
+| **Copilot** | Answer any money question | Chat with suggested prompts; every figure cited to a snapshot/forecast/scenario |
+| **Purchase Intelligence** (modal) | Verdict on a specific purchase | Yes / Tight / Not now + impact list + risk level |
+| **Plan → Goals** | Goal GPS | % complete + ETA date per goal; ETA sparkline |
+| **Plan → Budgets** | Category limits | Time-adjusted pace bars ("on pace"/"hot") |
+| **Plan → Recurring** | Bills, subscriptions, income | Confirm queue; subscriptions table with Keep/Review/Cancel |
+| **Plan → Calendar** | Future cash flow | Month grid of dated events + projected running balance; minimum-balance day highlighted |
+| **Activity** | Transactions + corrections | Day groups with discretionary subtotals; review queue pinned |
+| **Settings** | Trust & control | Connections w/ sync status; floor; payday; AI toggle; forecast-accuracy chart |
 
-## 4. Screen: Plan
-
-Three tabs:
-
-- **Budgets** — per-category monthly limits with pace bars ("on pace" / "hot"), where
-  the bar shows *time-adjusted* pace (70% spent at 60% of month = amber, not red).
-- **Goals** — cards: name, progress ring, `$X/mo`, projected completion date. The
-  projected date is live — it moves when spending behavior changes, which is the
-  motivating feedback loop.
-- **Recurring** — detected bills/subscriptions/income awaiting confirmation
-  (`Looks like Netflix, $15.49 monthly — confirm?`), the confirmed list sorted by next
-  due date, price-increase flags, and paycheck streams (which define the engine period,
-  so confirming income is part of onboarding).
-
-## 5. Screen: Simulate
-
-Two modes, both powered by the same pure engine (no writes, instantly reversible):
-
-- **"Can I buy this?"** — enter amount (+ optional category/date) →
-  `Buying this drops your daily allowance from $47 → $35 until Jul 15.` +
-  30-day mini-chart of with/without curves + goal-date deltas
-  (`Vacation: Aug 12 → Aug 17`). Two buttons: **"I bought it"** (logs a planned
-  transaction so the number updates *now*, reconciled when the real txn syncs) and
-  **"Skipping it"** (positive reinforcement: "+5 days sooner to Vacation 🎉").
-- **"What if I save more?"** — adjust a goal's monthly contribution with a slider →
-  live-updated completion date and new daily allowance.
-
-## 6. Screen: Settings
-
-Connections (institution list, sync status, re-auth banner when `login_required`,
-add via Plaid Link), account toggles (`include in cash pool`), emergency floor,
-payday/period strategy, timezone, profile/security.
-
----
-
-## 7. Key flows
+## 3. Key flows
 
 ### Onboarding (the trust-building 5 minutes)
-1. Register → 2. Connect first institution (Plaid Link) → 3. Sync runs with progress
-   ("found 4 accounts, 312 transactions") → 4. **Confirm income**: "This looks like your
-   paycheck: $2,140 every other Friday — right?" → 5. Confirm top detected bills →
-   6. Set emergency floor (default $500, explained) → 7. Optional first goal →
-   8. **Reveal the number** with a one-time annotated walkthrough of the breakdown.
+1. Register → 2. Connect first institution (Plaid Link) → 3. Sync with progress
+("found 4 accounts, 312 transactions") → 4. **Confirm income** ("Looks like your
+paycheck: $2,140 every other Friday — right?") → 5. Confirm top bills → 6. Set
+emergency floor (default $500, explained) → 7. Optional first goal → 8. **Reveal**:
+annotated walkthrough of the number, then the first briefing.
+Income confirmation precedes the reveal — the period boundary is what makes the number
+credible.
 
-Order matters: income confirmation before the reveal, because the period boundary is
-what makes the number credible.
+### Daily loop (the habit, <30s)
+Morning notification → open Today → read briefing + number → maybe expand a "why" →
+maybe clear review queue → done. Everything else is pull, not push.
 
-### Daily loop (the habit)
-Open app → see number → maybe expand "why" → maybe clear review queue → done in <30s.
+### Purchase decision (the differentiator, <10s)
+Anywhere → "Can I afford this?" → amount (+optional category) → verdict + impact +
+risk → **"I bought it"** (logs planned transaction; number updates now; reconciled on
+sync) or **"Skipping it"** (positive reinforcement: "+5 days sooner to Vacation").
 
 ### Correction loop (the learning)
-Wrong category → fix in two taps → "apply to all Starbucks?" → rule created → future
-transactions auto-correct → review queue shrinks over weeks. Trust compounds.
+Wrong category → two-tap fix → "always categorize [Merchant] like this?" → rule →
+review queue shrinks over weeks → trust compounds.
 
----
+### Copilot session
+Open Copilot → suggested prompts ("Why did my number change today?", "What should I do
+with my next paycheck?") → streamed answer with tappable citations that deep-link to
+the underlying screen (snapshot breakdown, forecast day, goal). Copilot proposes
+actions but only deep-links — it never mutates data in v1.
 
-## 8. Voice & tone
+## 4. Explainability as a UI pattern
+
+One consistent affordance everywhere: **any number or verdict can be tapped to expand
+its "why"** — engine line items, score reasons, ETA math, recommendation facts,
+copilot citations. Same component, same interaction, learned once. This is the
+product's personality in UI form.
+
+## 5. Voice & tone
 
 | Situation | ❌ Not this | ✅ This |
 |---|---|---|
-| Over budget | "You blew your restaurant budget." | "Restaurants are done for the month — the number now leans on your other categories." |
+| Over budget | "You blew your restaurant budget." | "Restaurants are done for the month — the number now leans on other categories." |
 | $0 day | "$-23.40" | "Hold off today — here's the 3-day path back to green." |
 | Underspend | (silence) | "You spent $18 under yesterday. Today's number went up." |
 | Big purchase | "Are you sure??" | "Doable — it costs $9.80/day until payday. Your call." |
+| Trend warning | "You keep overspending on Fridays." | "Fridays run ~$22 hotter than average. Planning for it keeps the rest of the week steady." |
+| Goal slipping | "You'll miss your goal." | "At this pace, Christmas fund lands Jan 9. An extra $35/mo brings it back to Dec 20." |
 
-Numbers are never hidden to spare feelings; framing is always *what to do next*.
+Rules: forward-looking, quantified, dismissible, max 2–3 active nudges, numbers never
+hidden to spare feelings — framing is always *what to do next*. The copilot inherits
+this voice via system prompt; the briefing via templates.
 
----
+## 6. Visual system
 
-## 9. Component & visual notes
-
-- Tailwind + Radix (in repo). Typography-led: the number is the hero (tabular numerals,
-  ~64px). Neutral palette, one accent; amber/red reserved for state meaning.
-- Charts (sparklines, pace bars, simulate curves) via Recharts, per the dataviz skill's
-  system when we build them: minimal axes, no chart junk.
-- Dark mode from day one (evening check-ins are a core moment).
-- Currency renders from decimal strings — never float math in the UI either.
+- Typography-led; the number is the hero (tabular numerals, ~64px). Neutral palette,
+  one accent; amber/red reserved for state meaning (tight / hold-off).
+- Health score shown as a small chip (91) with trend arrow — deliberately not a big
+  gauge; the score explains, it doesn't dominate.
+- Charts (ETA sparklines, pace bars, forecast curves, calendar balance line) via
+  Recharts, built per the dataviz skill's system: minimal axes, no chart junk.
+- Currency renders from decimal strings — no float math in the UI either.
