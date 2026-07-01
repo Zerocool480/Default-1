@@ -20,5 +20,7 @@ Read in this order:
 6. **[ROADMAP.md](ROADMAP.md)** — thirteen small milestones (M0–M12), external
    keys/dependencies table, and open questions awaiting owner decisions.
 
-Status: architecture phase — no application code yet. M0 begins implementation;
-M0–M5 require no external accounts (seed data only).
+Status: **M0–M5 implemented** in [`../safespend/`](../safespend/README.md) — engine,
+forecast, goal GPS, Today/Activity/Plan/Settings, and the category learning loop,
+running on seed data. Next up: M6 (Plaid connectivity — needs sandbox keys), then
+M7–M12 per the roadmap.
