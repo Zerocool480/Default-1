@@ -13,6 +13,7 @@ import { transactionsRouter } from './routes/transactions';
 import { goalsRouter } from './routes/goals';
 import { simulateRouter } from './routes/simulate';
 import { briefingRouter, insightsRouter, scoreRouter } from './routes/briefing';
+import { copilotRouter } from './routes/copilot';
 import { getOrCreateTodayBriefing } from './services/briefingService';
 import { miscRouter } from './routes/misc';
 import { computeAndSnapshot } from './services/engineService';
@@ -35,6 +36,7 @@ app.use('/api/simulate', simulateRouter);
 app.use('/api/briefing', briefingRouter);
 app.use('/api/score', scoreRouter);
 app.use('/api/insights', insightsRouter);
+app.use('/api/copilot', copilotRouter);
 app.use('/api', miscRouter);
 
 // Central error handler: never leak internals, never fail silently.

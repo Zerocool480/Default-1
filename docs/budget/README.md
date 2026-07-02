@@ -20,8 +20,11 @@ Read in this order:
 6. **[ROADMAP.md](ROADMAP.md)** — thirteen small milestones (M0–M12), external
    keys/dependencies table, and open questions awaiting owner decisions.
 
-Status: **M0–M6 implemented** in [`../safespend/`](../safespend/README.md) — engine,
-forecast, goal GPS, Today/Activity/Plan/Settings, the category learning loop, and
-Plaid connectivity (Link flow, AES-256-GCM token storage, cursor-based sync with
-pending→posted handling, balances/liabilities/recurring bootstrap, webhook endpoint,
-daily sweep). Next up: M7 (recurring hardening + budgets + calendar) per the roadmap.
+Status: **all v1 milestones (M0–M12) implemented** in
+[`../safespend/`](../safespend/README.md): the Daily Spending Engine, cash-flow
+forecast, goal GPS, Purchase Intelligence, Financial Health Score, Daily Briefing,
+coach insights, subscription manager, budgets + calendar, Plaid connectivity, the
+Anthropic-powered Financial Copilot (tool-use over the intelligence layer), and
+Haiku AI categorization. Remaining known gaps: live Plaid sandbox run (blocked by
+session network policy — code fixture-tested), M7's transaction↔stream matching
+hardening, and the backlog in ROADMAP §Later.

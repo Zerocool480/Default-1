@@ -11,6 +11,8 @@ import { categorizeByRules } from './categorize';
 import { ensureDefaultCategories, mapPfcToCategoryName } from './taxonomy';
 import { computeAndSnapshot } from './engineService';
 import { listGoalsWithEtas } from './goalService';
+import { aiEnabled } from '../ai/copilot';
+import { categorizeWithAI } from '../ai/categorizer';
 
 type Item = typeof schema.plaidItems.$inferSelect;
 
@@ -267,6 +269,39 @@ async function syncRecurring(item: Item, accountIds: Map<string, string>): Promi
 }
 
 /**
+ * Tier 3 (ADR-4): AI fallback for whatever rules and Plaid categories left
+ * uncategorized. Merchant strings only; unsure stays in the review queue.
+ */
+async function applyAiCategorization(userId: string): Promise<void> {
+  if (!aiEnabled()) return;
+  const pending = await db
+    .select()
+    .from(schema.transactions)
+    .where(
+      and(eq(schema.transactions.userId, userId), eq(schema.transactions.categorySource, 'none')),
+    )
+    .limit(40);
+  if (pending.length === 0) return;
+
+  const categories = await ensureDefaultCategories(userId);
+  const spendingNames = [...categories.keys()];
+  const results = await categorizeWithAI(
+    pending.map((t) => t.merchantName ?? t.name),
+    spendingNames,
+  );
+  for (const r of results) {
+    if (!r.category) continue;
+    const categoryId = categories.get(r.category);
+    const txn = pending[r.index];
+    if (!categoryId || !txn) continue;
+    await db
+      .update(schema.transactions)
+      .set({ categoryId, categorySource: 'ai', updatedAt: new Date() })
+      .where(eq(schema.transactions.id, txn.id));
+  }
+}
+
+/**
  * The one sync path (ARCHITECTURE ADR-5): webhook, cron sweep, and the manual
  * refresh button all end up here. Idempotent — safe to run repeatedly.
  */
@@ -280,6 +315,9 @@ export async function syncItem(itemId: string): Promise<{ touched: number }> {
     const touched = await syncTransactions(item, accountIds);
     await syncLiabilities(item, accountIds);
     await syncRecurring(item, accountIds);
+    await applyAiCategorization(item.userId).catch((err) =>
+      console.error('[ai categorization]', err),
+    );
     await computeAndSnapshot(item.userId, 'sync');
     await listGoalsWithEtas(item.userId, { recordHistory: true, trigger: 'sync' });
     return { touched };
