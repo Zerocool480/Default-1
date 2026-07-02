@@ -4,10 +4,12 @@ A personal financial operating system built around one daily answer:
 **"How much money can I safely spend today without hurting my financial goals?"**
 
 Design docs live in [`../docs/budget/`](../docs/budget/README.md). This app implements
-milestones **M0–M5** of the [roadmap](../docs/budget/ROADMAP.md): the Daily Spending
-Engine, cash-flow forecast, goal GPS, the Today/Activity/Plan/Settings screens, and the
-category learning loop — all running on seeded demo data (no bank credentials needed
-until M6).
+milestones **M0–M6** of the [roadmap](../docs/budget/ROADMAP.md): the Daily Spending
+Engine, cash-flow forecast, goal GPS, the Today/Activity/Plan/Settings screens, the
+category learning loop, and Plaid bank connectivity (Link → encrypted tokens →
+cursor-based sync → balances/liabilities/recurring). Runs fully on seeded demo data
+with no Plaid keys; add `PLAID_CLIENT_ID`/`PLAID_SECRET` (sandbox) to `.env` to enable
+the “Connect a bank” flow in Settings.
 
 ## Quickstart
 

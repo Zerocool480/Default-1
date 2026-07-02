@@ -29,6 +29,7 @@ miscRouter.get('/accounts', async (req, res) => {
       includeInCashPool: account.includeInCashPool,
       institutionName: item.institutionName,
       provider: item.provider,
+      itemStatus: item.status,
       lastSyncedAt: item.lastSyncedAt,
     })),
   );

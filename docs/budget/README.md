@@ -20,7 +20,8 @@ Read in this order:
 6. **[ROADMAP.md](ROADMAP.md)** — thirteen small milestones (M0–M12), external
    keys/dependencies table, and open questions awaiting owner decisions.
 
-Status: **M0–M5 implemented** in [`../safespend/`](../safespend/README.md) — engine,
-forecast, goal GPS, Today/Activity/Plan/Settings, and the category learning loop,
-running on seed data. Next up: M6 (Plaid connectivity — needs sandbox keys), then
-M7–M12 per the roadmap.
+Status: **M0–M6 implemented** in [`../safespend/`](../safespend/README.md) — engine,
+forecast, goal GPS, Today/Activity/Plan/Settings, the category learning loop, and
+Plaid connectivity (Link flow, AES-256-GCM token storage, cursor-based sync with
+pending→posted handling, balances/liabilities/recurring bootstrap, webhook endpoint,
+daily sweep). Next up: M7 (recurring hardening + budgets + calendar) per the roadmap.

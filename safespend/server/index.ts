@@ -5,6 +5,8 @@ import cron from 'node-cron';
 import { desc, eq } from 'drizzle-orm';
 import { db, schema } from '../db';
 import { authRouter } from './routes/auth';
+import { plaidRouter, plaidWebhookRouter } from './routes/plaid';
+import { syncItem } from './services/syncService';
 import { engineRouter } from './routes/engine';
 import { forecastRouter } from './routes/forecast';
 import { transactionsRouter } from './routes/transactions';
@@ -20,6 +22,8 @@ app.use(cookieParser());
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', authRouter);
+app.use('/api/plaid', plaidRouter);
+app.use('/api/webhooks/plaid', plaidWebhookRouter);
 app.use('/api/engine', engineRouter);
 app.use('/api/forecast', forecastRouter);
 app.use('/api/transactions', transactionsRouter);
@@ -57,6 +61,21 @@ cron.schedule('5 * * * *', async () => {
     }
   } catch (err) {
     console.error('[rollover]', err);
+  }
+});
+
+/** Daily sync sweep at 06:10 server time — webhooks cover freshness between. */
+cron.schedule('10 6 * * *', async () => {
+  try {
+    const items = await db
+      .select({ id: schema.plaidItems.id })
+      .from(schema.plaidItems)
+      .where(eq(schema.plaidItems.provider, 'plaid'));
+    for (const { id } of items) {
+      await syncItem(id).catch((err) => console.error(`[sync sweep] item ${id}`, err));
+    }
+  } catch (err) {
+    console.error('[sync sweep]', err);
   }
 });
 

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { LogOut, Moon } from 'lucide-react';
+import { LogOut, Moon, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
 import { formatCents, toCents } from '@shared/money';
+import { ConnectBank } from '../components/ConnectBank';
 
 interface Account {
   id: string;
@@ -15,6 +16,8 @@ interface Account {
   includeInCashPool: boolean;
   institutionName: string | null;
   provider: string;
+  itemStatus: string;
+  lastSyncedAt: string | null;
 }
 
 interface UserSettings {
@@ -42,8 +45,15 @@ export function SettingsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['me'] }),
   });
 
+  const syncNow = useMutation({
+    mutationFn: () => api<{ transactionsSynced: number }>('/api/plaid/sync', { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries(),
+  });
+
   const [floor, setFloor] = useState<string | null>(null);
   const floorValue = floor ?? settings.data?.emergencyFloor ?? '';
+  const hasPlaidAccounts = (accounts.data ?? []).some((a) => a.provider === 'plaid');
+  const needsReauth = (accounts.data ?? []).some((a) => a.itemStatus === 'login_required');
 
   function toggleTheme() {
     const isDark = document.documentElement.classList.toggle('dark');
@@ -55,9 +65,24 @@ export function SettingsPage() {
       <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
 
       <section>
-        <h2 className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-          Accounts
-        </h2>
+        <div className="mb-1.5 flex items-center justify-between px-1">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Accounts</h2>
+          {hasPlaidAccounts && (
+            <button
+              className="btn-ghost text-xs"
+              onClick={() => syncNow.mutate()}
+              disabled={syncNow.isPending}
+            >
+              <RefreshCw size={13} className={syncNow.isPending ? 'animate-spin' : ''} />
+              {syncNow.isPending ? 'Syncing…' : 'Sync now'}
+            </button>
+          )}
+        </div>
+        {needsReauth && (
+          <p className="mb-2 rounded-lg bg-state-tight/10 px-3 py-2 text-xs text-state-tight">
+            One of your banks needs you to sign in again — reconnect it below to resume syncing.
+          </p>
+        )}
         <div className="card divide-y divide-black/5 p-0 dark:divide-white/5">
           {(accounts.data ?? []).map((a) => (
             <div key={a.id} className="flex items-center gap-3 px-4 py-3">
@@ -88,9 +113,12 @@ export function SettingsPage() {
           ))}
         </div>
         <p className="mt-1.5 px-1 text-[11px] text-ink-faint">
-          “Spendable” accounts feed Safe-to-Spend. Bank connections (Plaid) arrive with milestone
-          M6 — these accounts are demo data until then.
+          “Spendable” accounts feed Safe-to-Spend. Connected banks sync automatically every day
+          and on demand.
         </p>
+        <div className="mt-3">
+          <ConnectBank />
+        </div>
       </section>
 
       <section>

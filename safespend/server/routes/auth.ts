@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { db, schema } from '../../db';
 import { clearSession, getUserId, issueSession, requireAuth } from '../auth';
+import { ensureDefaultCategories } from '../services/taxonomy';
 
 export const authRouter = Router();
 
@@ -27,6 +28,7 @@ authRouter.post('/register', async (req, res) => {
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
   const [user] = await db.insert(schema.users).values({ email, passwordHash }).returning();
   await db.insert(schema.userSettings).values({ userId: user!.id });
+  await ensureDefaultCategories(user!.id);
   issueSession(res, user!.id);
   res.status(201).json({ id: user!.id, email });
 });
