@@ -4,11 +4,13 @@ import { and, eq } from 'drizzle-orm';
 import { getUserId, requireAuth } from '../auth';
 import { db, schema } from '../../db';
 import { encryptToken } from '../crypto';
+import type { Request } from 'express';
 import {
   createLinkToken,
   exchangePublicToken,
   getInstitutionName,
   plaidEnabled,
+  verifyWebhook,
 } from '../providers/plaid';
 import { syncAllItemsForUser, syncItem } from '../services/syncService';
 
@@ -82,14 +84,26 @@ plaidRouter.post('/sync', requireAuth, async (req, res) => {
 });
 
 /**
- * Plaid webhooks. No auth cookie — Plaid calls this directly. Every payload
- * is recorded, then acted on. Signature verification (JWT via
- * /webhook_verification_key/get) hardens this before production; in sandbox
- * the endpoint is not publicly reachable anyway and the daily cron sweep
- * covers freshness.
+ * Plaid webhooks. No auth cookie — Plaid calls this directly, so the payload
+ * is authenticated by verifying the `Plaid-Verification` JWT signature against
+ * the raw body (verifyWebhook). Verification is mandatory outside sandbox; in
+ * sandbox a present header is still verified, and its absence is allowed so
+ * local testing works without an internet-reachable endpoint. The daily cron
+ * sweep covers freshness regardless.
  */
 export const plaidWebhookRouter = Router();
 plaidWebhookRouter.post('/', async (req, res) => {
+  const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
+  const header = req.header('Plaid-Verification');
+  const mustVerify = plaidEnabled() && (process.env.PLAID_ENV ?? 'sandbox') !== 'sandbox';
+  if (header || mustVerify) {
+    const ok = rawBody ? await verifyWebhook(rawBody, header) : false;
+    if (!ok) {
+      res.status(401).json({ error: 'Invalid webhook signature' });
+      return;
+    }
+  }
+
   const body = req.body as {
     webhook_type?: string;
     webhook_code?: string;

@@ -2,6 +2,8 @@
  * Plaid implementation of the bank-provider seam (ARCHITECTURE ADR-3).
  * Access tokens are decrypted only inside this module and never logged.
  */
+import { createHash, createPublicKey, timingSafeEqual } from 'node:crypto';
+import jwt from 'jsonwebtoken';
 import {
   Configuration,
   CountryCode,
@@ -9,6 +11,7 @@ import {
   PlaidEnvironments,
   Products,
   type AccountBase,
+  type JWKPublicKey,
   type RemovedTransaction,
   type Transaction,
   type TransactionStream,
@@ -159,5 +162,60 @@ export async function getRecurringStreams(
     return { inflow: res.data.inflow_streams, outflow: res.data.outflow_streams };
   } catch {
     return { inflow: [], outflow: [] };
+  }
+}
+
+/**
+ * Verify a Plaid webhook per https://plaid.com/docs/api/webhooks/webhook-verification/:
+ * the `Plaid-Verification` header is an ES256 JWT whose signing key is fetched
+ * by `kid` from Plaid, and whose `request_body_sha256` claim must match the raw
+ * body. Prevents a spoofed webhook from tampering with item state or forcing
+ * syncs. Keys are cached by kid.
+ */
+const keyCache = new Map<string, JWKPublicKey>();
+
+export async function verifyWebhook(
+  rawBody: Buffer,
+  verificationHeader: string | undefined,
+): Promise<boolean> {
+  if (!verificationHeader || !plaidEnabled()) return false;
+
+  const decoded = jwt.decode(verificationHeader, { complete: true });
+  if (!decoded || typeof decoded === 'string') return false;
+  if (decoded.header.alg !== 'ES256') return false; // block alg-confusion downgrades
+  const kid = decoded.header.kid;
+  if (!kid) return false;
+
+  let jwk = keyCache.get(kid);
+  if (!jwk) {
+    try {
+      const res = await plaidClient().webhookVerificationKeyGet({ key_id: kid });
+      jwk = res.data.key;
+    } catch {
+      return false;
+    }
+    if (jwk.expired_at) return false;
+    keyCache.set(kid, jwk);
+  }
+
+  try {
+    // Import only the EC public parameters; extra JWK fields (use/alg) can
+    // otherwise conflict with Node's key import.
+    const keyObject = createPublicKey({
+      key: { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y } as unknown as import('crypto').JsonWebKey,
+      format: 'jwk',
+    });
+    const payload = jwt.verify(verificationHeader, keyObject, {
+      algorithms: ['ES256'],
+      maxAge: '5m', // reject replayed/stale webhooks
+    }) as { request_body_sha256?: string };
+    if (!payload.request_body_sha256) return false;
+
+    const actual = createHash('sha256').update(rawBody).digest('hex');
+    const a = Buffer.from(actual);
+    const b = Buffer.from(payload.request_body_sha256);
+    return a.length === b.length && timingSafeEqual(a, b);
+  } catch {
+    return false;
   }
 }

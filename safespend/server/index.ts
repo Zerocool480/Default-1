@@ -23,7 +23,14 @@ import { todayInTimezone } from '../shared/dates';
 const app = express();
 // Behind a hosting proxy (Render/Railway/etc.) secure cookies need this.
 app.set('trust proxy', 1);
-app.use(express.json());
+// Stash the raw body so the Plaid webhook can verify its SHA-256 signature.
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
+    },
+  }),
+);
 app.use(cookieParser());
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
