@@ -28,7 +28,7 @@ interface Stream {
   isEssential: boolean;
 }
 
-type Tab = 'goals' | 'recurring' | 'budgets';
+type Tab = 'goals' | 'budgets' | 'recurring' | 'calendar';
 
 export function PlanPage() {
   const [tab, setTab] = useState<Tab>('goals');
@@ -36,12 +36,12 @@ export function PlanPage() {
     <div className="flex flex-col gap-4">
       <h1 className="text-lg font-semibold tracking-tight">Plan</h1>
       <div className="flex gap-1 rounded-xl bg-black/5 p-1 dark:bg-white/5">
-        {(['goals', 'recurring', 'budgets'] as const).map((t) => (
+        {(['goals', 'budgets', 'recurring', 'calendar'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={clsx(
-              'flex-1 rounded-lg px-3 py-1.5 text-sm font-medium capitalize',
+              'flex-1 rounded-lg px-2 py-1.5 text-sm font-medium capitalize',
               tab === t ? 'bg-surface shadow-sm dark:bg-surface-dark-raised' : 'text-ink-faint',
             )}
           >
@@ -50,13 +50,139 @@ export function PlanPage() {
         ))}
       </div>
       {tab === 'goals' && <GoalsTab />}
+      {tab === 'budgets' && <BudgetsTab />}
       {tab === 'recurring' && <RecurringTab />}
-      {tab === 'budgets' && (
-        <p className="card text-sm text-ink-faint">
-          Category budgets with pace bars arrive with milestone M7 — your limits are already
-          stored and feeding the seed data.
+      {tab === 'calendar' && <CalendarTab />}
+    </div>
+  );
+}
+
+interface BudgetsResponse {
+  monthProgressPct: number;
+  budgets: Array<{
+    id: string;
+    categoryName: string;
+    monthlyLimit: string;
+    spent: string;
+  }>;
+}
+
+function BudgetsTab() {
+  const budgets = useQuery({ queryKey: ['budgets'], queryFn: () => api<BudgetsResponse>('/api/budgets') });
+  if (budgets.isLoading) return <p className="text-center text-ink-faint">Loading budgets…</p>;
+  const data = budgets.data;
+  if (!data || data.budgets.length === 0) {
+    return <p className="card text-sm text-ink-faint">No category budgets yet.</p>;
+  }
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="px-1 text-xs text-ink-faint">{data.monthProgressPct}% of the month is gone —
+        bars compare spending pace against that.</p>
+      {data.budgets.map((b) => {
+        const limit = toCents(b.monthlyLimit);
+        const spent = toCents(b.spent);
+        const pct = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 100;
+        // Time-adjusted pace: 70% spent at 60% of month = hot, not red.
+        const pace = pct <= data.monthProgressPct + 5 ? 'ok' : pct < 100 ? 'hot' : 'over';
+        return (
+          <div key={b.id} className="card py-3">
+            <div className="mb-1.5 flex items-baseline justify-between text-sm">
+              <span className="font-medium">{b.categoryName}</span>
+              <span className="tabular text-ink-soft dark:text-gray-300">
+                {formatCents(spent)} of {formatCents(limit)}
+              </span>
+            </div>
+            <div className="relative h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+              <div
+                className={clsx(
+                  'h-full rounded-full',
+                  pace === 'ok' ? 'bg-accent' : pace === 'hot' ? 'bg-state-tight' : 'bg-state-hold',
+                )}
+                style={{ width: `${pct}%` }}
+              />
+              <div
+                className="absolute top-0 h-full w-0.5 bg-ink-faint/60"
+                style={{ left: `${data.monthProgressPct}%` }}
+                title="today"
+              />
+            </div>
+            <p className="mt-1 text-[11px] text-ink-faint">
+              {pace === 'ok'
+                ? 'On pace.'
+                : pace === 'hot'
+                  ? `Running hot — ${formatCents(Math.max(0, limit - spent))} left for the rest of the month.`
+                  : 'Done for the month — the engine leans on other categories now.'}
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+interface ForecastResponse {
+  todayISO: string;
+  days: Array<{
+    dateISO: string;
+    endBalanceCents: number;
+    events: Array<{ id: string; label: string; amountCents: number; type: string }>;
+  }>;
+  minDay: { dateISO: string; endBalanceCents: number };
+}
+
+function CalendarTab() {
+  const forecast = useQuery({
+    queryKey: ['forecast', 30],
+    queryFn: () => api<ForecastResponse>('/api/forecast?horizon=30'),
+  });
+  if (forecast.isLoading) return <p className="text-center text-ink-faint">Projecting…</p>;
+  const data = forecast.data;
+  if (!data) return <p className="card text-sm text-state-hold">Couldn't load the forecast.</p>;
+  const eventDays = data.days.filter((d) => d.events.length > 0);
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="card border border-black/5 py-3 dark:border-white/10">
+        <p className="text-sm">
+          Lowest point in the next 30 days:{' '}
+          <span
+            className={clsx(
+              'tabular font-semibold',
+              data.minDay.endBalanceCents < 0 ? 'text-state-hold' : '',
+            )}
+          >
+            {formatCents(data.minDay.endBalanceCents)}
+          </span>{' '}
+          on {formatShort(data.minDay.dateISO)}
         </p>
-      )}
+        <p className="mt-0.5 text-[11px] text-ink-faint">
+          Projected at your current allowance spend rate. Safe-to-Spend already accounts for this.
+        </p>
+      </div>
+      <div className="card divide-y divide-black/5 p-0 dark:divide-white/5">
+        {eventDays.map((d) => (
+          <div key={d.dateISO} className="flex flex-col gap-1 px-4 py-3">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
+                {formatShort(d.dateISO)}
+              </span>
+              <span className="tabular text-[11px] text-ink-faint">
+                balance {formatCents(d.endBalanceCents)}
+              </span>
+            </div>
+            {d.events.map((e) => (
+              <div key={`${e.id}-${e.label}`} className="flex justify-between text-sm">
+                <span className={clsx(e.amountCents > 0 && 'font-medium text-accent')}>{e.label}</span>
+                <span className="tabular">{formatCents(e.amountCents, { sign: e.amountCents > 0 })}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+        {eventDays.length === 0 && (
+          <p className="px-4 py-3 text-sm text-ink-faint">
+            No scheduled money events in the next 30 days.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

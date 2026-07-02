@@ -11,6 +11,7 @@ import { engineRouter } from './routes/engine';
 import { forecastRouter } from './routes/forecast';
 import { transactionsRouter } from './routes/transactions';
 import { goalsRouter } from './routes/goals';
+import { simulateRouter } from './routes/simulate';
 import { miscRouter } from './routes/misc';
 import { computeAndSnapshot } from './services/engineService';
 import { todayInTimezone } from '../shared/dates';
@@ -28,6 +29,7 @@ app.use('/api/engine', engineRouter);
 app.use('/api/forecast', forecastRouter);
 app.use('/api/transactions', transactionsRouter);
 app.use('/api/goals', goalsRouter);
+app.use('/api/simulate', simulateRouter);
 app.use('/api', miscRouter);
 
 // Central error handler: never leak internals, never fail silently.

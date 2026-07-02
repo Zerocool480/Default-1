@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Activity, CalendarRange, MessageCircle, Settings, Sun } from 'lucide-react';
 import clsx from 'clsx';
+import { AffordCheck } from './AffordCheck';
 
 const tabs = [
   { to: '/', label: 'Today', icon: Sun },
@@ -38,6 +39,8 @@ export function Layout({ children }: { children: ReactNode; email: string }) {
       </nav>
 
       <main className="flex-1 px-4 pb-24 pt-6 md:px-0 md:pb-10 md:pt-10">{children}</main>
+
+      <AffordCheck />
 
       {/* Mobile bottom bar */}
       <nav className="fixed inset-x-0 bottom-0 z-10 border-t border-black/5 bg-surface/95 backdrop-blur dark:border-white/10 dark:bg-surface-dark/95 md:hidden">

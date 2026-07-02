@@ -5,6 +5,7 @@ import { getUserId, requireAuth } from '../auth';
 import { db, schema } from '../../db';
 import { computeAndSnapshot } from '../services/engineService';
 import { createRuleFromCorrection } from '../services/categorize';
+import { todayInTimezone } from '../../shared/dates';
 
 export const transactionsRouter = Router();
 transactionsRouter.use(requireAuth);
@@ -43,6 +44,68 @@ transactionsRouter.get('/', async (req, res) => {
       accountType: account.type,
     })),
   );
+});
+
+/**
+ * "I bought it" — log a planned transaction so the number updates now; the
+ * real transaction reconciles it when it syncs (matching arrives with M7's
+ * recurring-matching work; until then it can be excluded/removed by hand).
+ */
+const plannedSchema = z.object({
+  amount: z.string().regex(/^\d+(\.\d{1,2})?$/),
+  name: z.string().min(1).max(80),
+  categoryId: z.string().uuid().optional(),
+});
+
+transactionsRouter.post('/planned', async (req, res) => {
+  const userId = getUserId(req);
+  const parsed = plannedSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid planned transaction' });
+    return;
+  }
+  const [settings] = await db
+    .select()
+    .from(schema.userSettings)
+    .where(eq(schema.userSettings.userId, userId));
+  const todayISO = todayInTimezone(settings?.timezone ?? 'America/New_York');
+
+  // Planned purchases count as discretionary spending; default to the first
+  // discretionary category when none is chosen so spentToday sees it.
+  let categoryId = parsed.data.categoryId ?? null;
+  if (!categoryId) {
+    const [fallback] = await db
+      .select()
+      .from(schema.categories)
+      .where(and(eq(schema.categories.userId, userId), eq(schema.categories.isDiscretionary, true)))
+      .limit(1);
+    categoryId = fallback?.id ?? null;
+  }
+
+  const [account] = await db
+    .select()
+    .from(schema.accounts)
+    .where(and(eq(schema.accounts.userId, userId), eq(schema.accounts.includeInCashPool, true)))
+    .limit(1);
+  if (!account) {
+    res.status(400).json({ error: 'No spendable account to log against' });
+    return;
+  }
+
+  await db.insert(schema.transactions).values({
+    userId,
+    accountId: account.id,
+    amount: parsed.data.amount,
+    date: todayISO,
+    name: parsed.data.name,
+    merchantName: parsed.data.name,
+    categoryId,
+    categorySource: categoryId ? 'user' : 'none',
+    source: 'planned',
+    isPending: true,
+  });
+  const snapshot = await computeAndSnapshot(userId, 'txn_edit');
+  res.status(201).json({ ok: true, snapshot });
 });
 
 const patchSchema = z.object({

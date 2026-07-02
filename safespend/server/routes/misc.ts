@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gte, sql } from 'drizzle-orm';
 import { getUserId, requireAuth } from '../auth';
 import { db, schema } from '../../db';
 import { computeAndSnapshot } from '../services/engineService';
+import { diffDays, firstOfMonth, firstOfNextMonth, todayInTimezone } from '../../shared/dates';
 
 /** Accounts, categories, recurring streams, and settings. */
 export const miscRouter = Router();
@@ -101,6 +102,54 @@ miscRouter.patch('/recurring/:id', async (req, res) => {
   // Confirming/dismissing a stream changes obligations and possibly the period.
   const snapshot = await computeAndSnapshot(userId, 'settings');
   res.json({ ok: true, snapshot });
+});
+
+/** Budgets with month-to-date spend and time-adjusted pace. */
+miscRouter.get('/budgets', async (req, res) => {
+  const userId = getUserId(req);
+  const [settings] = await db
+    .select()
+    .from(schema.userSettings)
+    .where(eq(schema.userSettings.userId, userId));
+  const todayISO = todayInTimezone(settings?.timezone ?? 'America/New_York');
+  const monthStart = firstOfMonth(todayISO);
+  const daysInMonth = diffDays(monthStart, firstOfNextMonth(todayISO));
+  const dayOfMonth = diffDays(monthStart, todayISO) + 1;
+
+  const budgets = await db
+    .select({ budget: schema.budgets, category: schema.categories })
+    .from(schema.budgets)
+    .innerJoin(schema.categories, eq(schema.budgets.categoryId, schema.categories.id))
+    .where(eq(schema.budgets.userId, userId));
+
+  const spentRows = await db
+    .select({
+      categoryId: schema.transactions.categoryId,
+      total: sql<string>`coalesce(sum(${schema.transactions.amount}), 0)`,
+    })
+    .from(schema.transactions)
+    .where(
+      and(
+        eq(schema.transactions.userId, userId),
+        gte(schema.transactions.date, monthStart),
+        eq(schema.transactions.excludeFromEngine, false),
+        sql`${schema.transactions.amount} > 0`,
+      ),
+    )
+    .groupBy(schema.transactions.categoryId);
+  const spentByCategory = new Map(spentRows.map((r) => [r.categoryId, r.total]));
+
+  res.json({
+    monthProgressPct: Math.round((dayOfMonth / daysInMonth) * 100),
+    budgets: budgets.map(({ budget, category }) => ({
+      id: budget.id,
+      categoryId: category.id,
+      categoryName: category.name,
+      isDiscretionary: category.isDiscretionary,
+      monthlyLimit: budget.monthlyLimit,
+      spent: spentByCategory.get(category.id) ?? '0.00',
+    })),
+  });
 });
 
 miscRouter.get('/settings', async (req, res) => {
