@@ -149,6 +149,7 @@ async function main() {
     category: string;
     freq: 'weekly' | 'biweekly' | 'monthly';
     amount: string;
+    last?: string;
     next: string;
     essential: boolean;
     status?: string;
@@ -163,7 +164,8 @@ async function main() {
     { desc: 'Netflix', merchant: 'NETFLIX', category: 'Subscriptions', freq: 'monthly', amount: '15.49', next: d(16), essential: false },
     { desc: 'Gym membership', merchant: 'PLANET FITNESS', category: 'Subscriptions', freq: 'monthly', amount: '24.99', next: d(19), essential: false },
     // One detected-but-unconfirmed stream for the confirm queue:
-    { desc: 'Hulu', merchant: 'HULU', category: 'Subscriptions', freq: 'monthly', amount: '17.99', next: d(11), essential: false, status: 'detected' },
+    // Hulu's price recently went up — feeds the price-increase coach insight.
+    { desc: 'Hulu', merchant: 'HULU', category: 'Subscriptions', freq: 'monthly', amount: '15.99', last: '17.99', next: d(11), essential: false, status: 'detected' },
   ];
   const streamIds = new Map<string, string>();
   for (const s of outflowStreams) {
@@ -178,7 +180,7 @@ async function main() {
         categoryId: cat(s.category),
         frequency: s.freq,
         averageAmount: s.amount,
-        lastAmount: s.amount,
+        lastAmount: s.last ?? s.amount,
         nextExpectedDate: s.next,
         status: s.status ?? 'confirmed',
         isEssential: s.essential,

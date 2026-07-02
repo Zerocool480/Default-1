@@ -23,6 +23,7 @@ interface Stream {
   merchantName: string | null;
   frequency: string;
   averageAmount: string;
+  lastAmount: string | null;
   nextExpectedDate: string | null;
   status: string;
   isEssential: boolean;
@@ -324,8 +325,66 @@ function RecurringTab() {
   const detected = all.filter((s) => s.status === 'detected');
   const confirmed = all.filter((s) => s.status === 'confirmed');
 
+  // Subscription manager: non-essential recurring outflows with true cost.
+  const PER_MONTH: Record<string, number> = {
+    weekly: 52 / 12,
+    biweekly: 26 / 12,
+    semi_monthly: 2,
+    monthly: 1,
+    annual: 1 / 12,
+    irregular: 0,
+  };
+  const subs = confirmed
+    .filter((s) => s.direction === 'outflow' && !s.isEssential)
+    .map((s) => {
+      const monthlyCents = Math.round(toCents(s.averageAmount) * (PER_MONTH[s.frequency] ?? 0));
+      const priceUp =
+        s.lastAmount !== null &&
+        toCents(s.lastAmount) >= toCents(s.averageAmount) * 1.07 &&
+        toCents(s.lastAmount) - toCents(s.averageAmount) >= 100;
+      return { ...s, monthlyCents, verdict: priceUp ? ('review' as const) : ('keep' as const) };
+    })
+    .sort((a, b) => b.monthlyCents - a.monthlyCents);
+  const subsMonthly = subs.reduce((t, s) => t + s.monthlyCents, 0);
+
   return (
     <div className="flex flex-col gap-4">
+      {subs.length > 0 && (
+        <section>
+          <h3 className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+            Subscriptions · {formatCents(subsMonthly)}/mo · {formatCents(subsMonthly * 12)}/yr
+          </h3>
+          <div className="card divide-y divide-black/5 p-0 dark:divide-white/5">
+            {subs.map((s) => (
+              <div key={s.id} className="flex items-center gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm">{s.description}</p>
+                  <p className="text-xs text-ink-faint">
+                    <span className="tabular">{formatCents(s.monthlyCents)}/mo</span> ·{' '}
+                    <span className="tabular">{formatCents(s.monthlyCents * 12)}/yr</span>
+                    {s.verdict === 'review' && s.lastAmount && (
+                      <span className="text-state-tight">
+                        {' '}
+                        · price up: last charge {formatCents(toCents(s.lastAmount))}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <span
+                  className={clsx(
+                    'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase',
+                    s.verdict === 'keep'
+                      ? 'bg-accent-soft text-accent dark:bg-accent/20'
+                      : 'bg-state-tight/10 text-state-tight',
+                  )}
+                >
+                  {s.verdict}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       {detected.length > 0 && (
         <section>
           <h3 className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-state-tight">

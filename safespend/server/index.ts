@@ -12,6 +12,8 @@ import { forecastRouter } from './routes/forecast';
 import { transactionsRouter } from './routes/transactions';
 import { goalsRouter } from './routes/goals';
 import { simulateRouter } from './routes/simulate';
+import { briefingRouter, insightsRouter, scoreRouter } from './routes/briefing';
+import { getOrCreateTodayBriefing } from './services/briefingService';
 import { miscRouter } from './routes/misc';
 import { computeAndSnapshot } from './services/engineService';
 import { todayInTimezone } from '../shared/dates';
@@ -30,6 +32,9 @@ app.use('/api/forecast', forecastRouter);
 app.use('/api/transactions', transactionsRouter);
 app.use('/api/goals', goalsRouter);
 app.use('/api/simulate', simulateRouter);
+app.use('/api/briefing', briefingRouter);
+app.use('/api/score', scoreRouter);
+app.use('/api/insights', insightsRouter);
 app.use('/api', miscRouter);
 
 // Central error handler: never leak internals, never fail silently.
@@ -63,6 +68,29 @@ cron.schedule('5 * * * *', async () => {
     }
   } catch (err) {
     console.error('[rollover]', err);
+  }
+});
+
+/** Morning briefings ~06:30 user-local: hourly pass generates any missing
+ *  briefing for users whose local time is 6am or later (idempotent — the
+ *  briefings table is unique per user+date). */
+cron.schedule('30 * * * *', async () => {
+  try {
+    const rows = await db
+      .select({ userId: schema.userSettings.userId, timezone: schema.userSettings.timezone })
+      .from(schema.userSettings);
+    for (const { userId, timezone } of rows) {
+      const hour = Number(
+        new Intl.DateTimeFormat('en-US', { timeZone: timezone, hour: 'numeric', hour12: false }).format(new Date()),
+      );
+      if (hour >= 6) {
+        await getOrCreateTodayBriefing(userId).catch((err) =>
+          console.error(`[briefing] user ${userId}`, err),
+        );
+      }
+    }
+  } catch (err) {
+    console.error('[briefing sweep]', err);
   }
 });
 

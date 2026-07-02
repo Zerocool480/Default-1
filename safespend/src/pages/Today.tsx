@@ -1,12 +1,34 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, RefreshCw } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ChevronDown, RefreshCw, X } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '../lib/api';
-import { formatCents } from '@shared/money';
+import { formatCents, toCents } from '@shared/money';
 import { formatShort } from '@shared/dates';
 import type { EngineResult } from '@shared/engine';
 import type { ForecastDay } from '@shared/forecast';
+import { OnboardingCard } from '../components/OnboardingCard';
+
+interface Briefing {
+  forDate: string;
+  healthScore: number | null;
+  healthDelta: number | null;
+  checkingTotal: string;
+  upcomingBillsTotal: string;
+  goalsStatus: 'on_track' | 'attention' | 'off_track';
+  recommendationCode: string;
+  recommendationText: string;
+  recommendationReasons: string[];
+}
+
+interface Insight {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  severity: string;
+}
 
 interface Snapshot {
   forDate: string;
@@ -44,6 +66,18 @@ export function TodayPage() {
     mutationFn: () => api<Snapshot>('/api/engine/recompute', { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries(),
   });
+  const briefing = useQuery({
+    queryKey: ['briefing'],
+    queryFn: () => api<Briefing>('/api/briefing/today'),
+  });
+  const insights = useQuery({
+    queryKey: ['insights'],
+    queryFn: () => api<Insight[]>('/api/insights'),
+  });
+  const dismiss = useMutation({
+    mutationFn: (id: string) => api(`/api/insights/${id}/dismiss`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['insights'] }),
+  });
 
   if (snapshot.isLoading) {
     return <p className="pt-16 text-center text-ink-faint">Working out your number…</p>;
@@ -75,14 +109,31 @@ export function TodayPage() {
             {new Date(computedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
           </p>
         </div>
-        <button
-          className="btn-ghost"
-          onClick={() => recompute.mutate()}
-          disabled={recompute.isPending}
-          title="Recompute now"
-        >
-          <RefreshCw size={15} className={recompute.isPending ? 'animate-spin' : ''} />
-        </button>
+        <div className="flex items-center gap-1">
+          {briefing.data?.healthScore != null && (
+            <Link
+              to="/score"
+              className="flex items-center gap-1 rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent dark:bg-accent/20"
+              title="Financial health"
+            >
+              ⛨ {briefing.data.healthScore}
+              {briefing.data.healthDelta != null && briefing.data.healthDelta !== 0 && (
+                <span className={briefing.data.healthDelta > 0 ? '' : 'text-state-hold'}>
+                  {briefing.data.healthDelta > 0 ? '▲' : '▼'}
+                  {Math.abs(briefing.data.healthDelta)}
+                </span>
+              )}
+            </Link>
+          )}
+          <button
+            className="btn-ghost"
+            onClick={() => recompute.mutate()}
+            disabled={recompute.isPending}
+            title="Recompute now"
+          >
+            <RefreshCw size={15} className={recompute.isPending ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </header>
 
       {/* The number */}
@@ -163,11 +214,64 @@ export function TodayPage() {
         )}
       </section>
 
+      <OnboardingCard />
+
+      {/* Today's briefing */}
+      {briefing.data && (
+        <section
+          className={clsx(
+            'card border-l-4',
+            briefing.data.recommendationCode === 'spend_freely'
+              ? 'border-l-accent'
+              : briefing.data.recommendationCode === 'recovery'
+                ? 'border-l-state-hold'
+                : 'border-l-state-tight',
+          )}
+        >
+          <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+            Today's briefing
+          </h2>
+          <p className="text-sm font-medium">{briefing.data.recommendationText}</p>
+          {briefing.data.recommendationReasons.map((r, i) => (
+            <p key={i} className="mt-1 text-xs text-ink-soft dark:text-gray-300">
+              {r}
+            </p>
+          ))}
+          <p className="mt-2 text-xs text-ink-faint">
+            Bills before payday:{' '}
+            <span className="tabular">{formatCents(toCents(briefing.data.upcomingBillsTotal))}</span>
+            {' · '}Goals:{' '}
+            {briefing.data.goalsStatus === 'on_track'
+              ? 'on track'
+              : briefing.data.goalsStatus === 'attention'
+                ? 'need attention'
+                : 'off track'}
+          </p>
+        </section>
+      )}
+
       {/* Next 7 days */}
       <section className="card">
         <h2 className="mb-3 text-sm font-semibold">Next 7 days</h2>
         {forecast.data ? <WeekStrip days={forecast.data.days} /> : <p className="text-xs text-ink-faint">Projecting…</p>}
       </section>
+
+      {/* Coach insights, max 2, dismissible */}
+      {(insights.data ?? []).map((insight) => (
+        <section key={insight.id} className="card flex items-start gap-2 py-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">{insight.title}</p>
+            <p className="mt-0.5 text-xs text-ink-soft dark:text-gray-300">{insight.body}</p>
+          </div>
+          <button
+            className="text-ink-faint hover:text-ink"
+            onClick={() => dismiss.mutate(insight.id)}
+            aria-label="Dismiss"
+          >
+            <X size={15} />
+          </button>
+        </section>
+      ))}
     </div>
   );
 }

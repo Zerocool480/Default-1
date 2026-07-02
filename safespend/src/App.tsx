@@ -8,6 +8,7 @@ import { ActivityPage } from './pages/Activity';
 import { PlanPage } from './pages/Plan';
 import { CopilotPage } from './pages/Copilot';
 import { SettingsPage } from './pages/Settings';
+import { ScorePage } from './pages/Score';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,6 +48,7 @@ function Gate() {
         <Route path="/plan/*" element={<PlanPage />} />
         <Route path="/copilot" element={<CopilotPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/score" element={<ScorePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
