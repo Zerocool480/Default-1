@@ -1,0 +1,64 @@
+name: SafeSpend CI
+
+on:
+  push:
+    branches: [claude/budgeting-app-architecture-c79r42]
+    paths:
+      - 'safespend/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    paths:
+      - 'safespend/**'
+      - '.github/workflows/ci.yml'
+
+jobs:
+  test:
+    name: Typecheck & tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: safespend
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: safespend
+          POSTGRES_PASSWORD: safespend_dev
+          POSTGRES_DB: safespend_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Sync-pipeline integration tests run against this real Postgres; the
+      # pure intelligence tests need no database.
+      DATABASE_URL: postgresql://safespend:safespend_dev@localhost:5432/safespend_test
+      TEST_DATABASE_URL: postgresql://safespend:safespend_dev@localhost:5432/safespend_test
+      JWT_SECRET: ci-only-not-a-real-secret
+      PLAID_TOKEN_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: safespend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply schema to the test database
+        run: npx drizzle-kit push --force
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
