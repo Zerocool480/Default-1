@@ -15,6 +15,9 @@ Runs fully on seeded demo data with no external keys. Optional `.env` additions:
 `AI_ENABLED=true` + `ANTHROPIC_API_KEY` enable the Copilot chat and tier-3 AI
 categorization (everything else works without them).
 
+**Deploying for real use?** See [DEPLOY.md](DEPLOY.md) — one-click Render
+blueprint, docker-compose, or bare Node.
+
 ## Quickstart
 
 ```bash

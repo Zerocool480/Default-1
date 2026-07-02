@@ -1,0 +1,29 @@
+# Render blueprint — deploy SafeSpend + Postgres in one click:
+# https://render.com → New → Blueprint → point at this repo.
+# Root directory is safespend/ (this file's folder).
+services:
+  - type: web
+    name: safespend
+    runtime: docker
+    rootDir: safespend
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: safespend-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PLAID_TOKEN_KEY
+        generateValue: true
+      - key: PLAID_ENV
+        value: sandbox
+      - key: AI_ENABLED
+        value: 'false'
+      # Set these in the Render dashboard when ready:
+      # PLAID_CLIENT_ID, PLAID_SECRET, ANTHROPIC_API_KEY
+
+databases:
+  - name: safespend-db
+    plan: basic-256mb

@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { Transaction as PlaidTransaction } from 'plaid';
 import { db, schema } from '../../db';
 import {
@@ -13,6 +13,10 @@ import { computeAndSnapshot } from './engineService';
 import { listGoalsWithEtas } from './goalService';
 import { aiEnabled } from '../ai/copilot';
 import { categorizeWithAI } from '../ai/categorizer';
+import { matchStream, type MatchableTxn } from '../../intelligence/recurring/match';
+import type { Frequency } from '../../intelligence/forecast/expand';
+import { toCents, fromCents } from '../../shared/money';
+import { addDays, todayInTimezone } from '../../shared/dates';
 
 type Item = typeof schema.plaidItems.$inferSelect;
 
@@ -269,6 +273,81 @@ async function syncRecurring(item: Item, accountIds: Map<string, string>): Promi
 }
 
 /**
+ * Bill↔payment matching (the "already paid" dedup): link unlinked
+ * transactions to confirmed streams and advance each stream's anchor past
+ * paid occurrences, so the engine never double-counts a paid bill. Runs
+ * repeatedly until no stream advances (a payment can settle at most one
+ * occurrence per pass).
+ */
+export async function matchTransactionsToStreams(userId: string): Promise<number> {
+  const todayISO = todayInTimezone('UTC');
+  let linked = 0;
+
+  for (let pass = 0; pass < 5; pass++) {
+    const streams = await db
+      .select()
+      .from(schema.recurringStreams)
+      .where(
+        and(
+          eq(schema.recurringStreams.userId, userId),
+          eq(schema.recurringStreams.status, 'confirmed'),
+        ),
+      );
+    const unlinked = await db
+      .select()
+      .from(schema.transactions)
+      .where(
+        and(
+          eq(schema.transactions.userId, userId),
+          sql`${schema.transactions.recurringStreamId} is null`,
+          sql`${schema.transactions.source} <> 'planned'`,
+          sql`${schema.transactions.date} >= ${addDays(todayISO, -45)}`,
+        ),
+      );
+    const candidates: MatchableTxn[] = unlinked.map((t) => ({
+      id: t.id,
+      dateISO: t.date,
+      amountCents: toCents(t.amount),
+      merchantName: t.merchantName,
+      name: t.name,
+    }));
+
+    let advanced = false;
+    for (const s of streams) {
+      const match = matchStream(
+        {
+          id: s.id,
+          direction: s.direction as 'inflow' | 'outflow',
+          merchantName: s.merchantName,
+          description: s.description,
+          frequency: s.frequency as Frequency,
+          averageAmountCents: toCents(s.averageAmount),
+          nextExpectedDateISO: s.nextExpectedDate,
+        },
+        candidates,
+      );
+      if (!match) continue;
+      await db
+        .update(schema.transactions)
+        .set({ recurringStreamId: s.id, isRecurring: true, updatedAt: new Date() })
+        .where(eq(schema.transactions.id, match.txnId));
+      await db
+        .update(schema.recurringStreams)
+        .set({
+          nextExpectedDate: match.newNextExpectedDateISO,
+          lastAmount: fromCents(match.lastAmountCents),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.recurringStreams.id, s.id));
+      linked++;
+      advanced = true;
+    }
+    if (!advanced) break;
+  }
+  return linked;
+}
+
+/**
  * Tier 3 (ADR-4): AI fallback for whatever rules and Plaid categories left
  * uncategorized. Merchant strings only; unsure stays in the review queue.
  */
@@ -315,6 +394,7 @@ export async function syncItem(itemId: string): Promise<{ touched: number }> {
     const touched = await syncTransactions(item, accountIds);
     await syncLiabilities(item, accountIds);
     await syncRecurring(item, accountIds);
+    await matchTransactionsToStreams(item.userId);
     await applyAiCategorization(item.userId).catch((err) =>
       console.error('[ai categorization]', err),
     );

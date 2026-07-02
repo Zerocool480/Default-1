@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import path from 'node:path';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import cron from 'node-cron';
@@ -20,6 +21,8 @@ import { computeAndSnapshot } from './services/engineService';
 import { todayInTimezone } from '../shared/dates';
 
 const app = express();
+// Behind a hosting proxy (Render/Railway/etc.) secure cookies need this.
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(cookieParser());
 
@@ -38,6 +41,15 @@ app.use('/api/score', scoreRouter);
 app.use('/api/insights', insightsRouter);
 app.use('/api/copilot', copilotRouter);
 app.use('/api', miscRouter);
+
+// In production the API server also serves the built SPA (vite build → dist).
+if (process.env.NODE_ENV === 'production') {
+  const distDir = path.resolve(import.meta.dirname, '../dist');
+  app.use(express.static(distDir));
+  app.get(/^\/(?!api\/).*/, (_req, res) => {
+    res.sendFile(path.join(distDir, 'index.html'));
+  });
+}
 
 // Central error handler: never leak internals, never fail silently.
 app.use(
