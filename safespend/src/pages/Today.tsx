@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { ChevronDown, RefreshCw, X } from 'lucide-react';
+import { ChevronDown, RefreshCw, ShieldCheck, X } from 'lucide-react';
 import clsx from 'clsx';
 import { api } from '../lib/api';
 import { formatCents, toCents } from '@shared/money';
@@ -113,12 +113,13 @@ export function TodayPage() {
           {briefing.data?.healthScore != null && (
             <Link
               to="/score"
-              className="flex items-center gap-1 rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent dark:bg-accent/20"
+              className="flex items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 text-sm font-semibold text-accent-strong shadow-sm ring-1 ring-accent/10 dark:bg-accent/20 dark:text-accent-soft dark:ring-accent/20"
               title="Financial health"
             >
-              ⛨ {briefing.data.healthScore}
+              <ShieldCheck size={15} />
+              {briefing.data.healthScore}
               {briefing.data.healthDelta != null && briefing.data.healthDelta !== 0 && (
-                <span className={briefing.data.healthDelta > 0 ? '' : 'text-state-hold'}>
+                <span className={clsx('text-xs', briefing.data.healthDelta < 0 && 'text-state-hold')}>
                   {briefing.data.healthDelta > 0 ? '▲' : '▼'}
                   {Math.abs(briefing.data.healthDelta)}
                 </span>
@@ -136,12 +137,27 @@ export function TodayPage() {
         </div>
       </header>
 
-      {/* The number */}
-      <section className="card flex flex-col items-center py-8">
-        <p className="text-sm font-medium text-ink-faint">
+      {/* The number — the whole product */}
+      <section
+        className={clsx(
+          'relative flex flex-col items-center overflow-hidden rounded-3xl px-5 py-10 text-center shadow-hero ring-1',
+          result.status === 'ok' &&
+            'bg-gradient-to-b from-accent-soft to-surface ring-accent/10 dark:from-accent/15 dark:to-surface-dark-raised dark:ring-accent/15',
+          result.status === 'tight' &&
+            'bg-gradient-to-b from-state-tight-soft to-surface ring-state-tight/15 dark:from-state-tight/15 dark:to-surface-dark-raised dark:ring-state-tight/20',
+          result.status === 'hold' &&
+            'bg-gradient-to-b from-state-hold-soft to-surface ring-state-hold/15 dark:from-state-hold/15 dark:to-surface-dark-raised dark:ring-state-hold/20',
+        )}
+      >
+        <p className="text-[13px] font-medium uppercase tracking-wide text-ink-faint">
           {overcommitted ? 'Hold off today' : 'Safe to Spend Today'}
         </p>
-        <p className={clsx('tabular my-2 text-6xl font-semibold tracking-tight', statusStyles[result.status])}>
+        <p
+          className={clsx(
+            'tabular mt-2.5 text-[68px] font-bold leading-none tracking-tight',
+            statusStyles[result.status],
+          )}
+        >
           {formatCents(result.safeToSpendTodayCents)}
         </p>
 
@@ -165,24 +181,24 @@ export function TodayPage() {
 
         {/* spent-today bar */}
         {!overcommitted && result.dailyAllowanceCents > 0 && (
-          <div className="mt-4 w-full max-w-xs">
-            <div className="h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+          <div className="mt-5 w-full max-w-xs">
+            <div className="h-2 overflow-hidden rounded-full bg-black/[0.07] dark:bg-white/10">
               <div
                 className={clsx(
-                  'h-full rounded-full transition-all',
+                  'h-full rounded-full transition-all duration-500',
                   spentPct < 80 ? 'bg-accent' : spentPct < 100 ? 'bg-state-tight' : 'bg-state-hold',
                 )}
-                style={{ width: `${spentPct}%` }}
+                style={{ width: `${Math.max(spentPct, 3)}%` }}
               />
             </div>
-            <p className="tabular mt-1.5 text-center text-xs text-ink-faint">
+            <p className="tabular mt-2 text-center text-xs text-ink-faint">
               spent {formatCents(result.spentTodayCents)} of {formatCents(result.dailyAllowanceCents)} today
             </p>
           </div>
         )}
 
         <button
-          className="btn-ghost mt-5 text-sm"
+          className="mt-6 inline-flex items-center gap-1 rounded-full bg-white/70 px-3.5 py-1.5 text-sm font-medium text-ink-soft shadow-sm ring-1 ring-black/5 transition-colors hover:bg-white dark:bg-white/10 dark:text-gray-200 dark:ring-white/10"
           onClick={() => setShowWhy(!showWhy)}
           aria-expanded={showWhy}
         >
@@ -191,7 +207,7 @@ export function TodayPage() {
         </button>
 
         {showWhy && (
-          <div className="mt-3 w-full max-w-sm rounded-xl bg-surface-raised p-4 text-sm dark:bg-surface-dark">
+          <div className="mt-4 w-full max-w-sm rounded-2xl bg-surface/80 p-4 text-left text-sm shadow-sm ring-1 ring-black/5 dark:bg-surface-dark/60 dark:ring-white/5">
             {result.lineItems.map((li, i) =>
               li.kind === 'divide' ? (
                 <div
