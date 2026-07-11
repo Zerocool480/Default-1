@@ -1158,7 +1158,8 @@ function renderJobDetail() {
       </div>
       <p class="hint" style="margin-top:8px;">Paste into the application form's fields, or attach the exported PDF/.doc. You review and hit submit — no bot, no banned accounts, and every application is genuinely tailored.</p>
     </div>
-    ${prepHTML(job)}`;
+    ${prepHTML(job)}
+    ${beyondHTML(job)}`;
 }
 
 /* ================================================================
@@ -1202,6 +1203,24 @@ function genCoverLetter(job) {
   const contactLine = [c.phone, c.email].filter(Boolean).join(' | ');
   if (contactLine) L.push(contactLine);
   return L.join('\n');
+}
+
+function beyondHTML(job) {
+  if (!job.analysis?.keywords?.length) return '';
+  const topReq = job.analysis.keywords.filter(k => k.req).slice(0, 5).map(k => k.term);
+  const top = (topReq.length ? topReq : job.analysis.keywords.slice(0, 5).map(k => k.term));
+  return `
+  <div class="card" id="beyond-card">
+    <h3>Beyond the resume — where senior candidates actually get found</h3>
+    <p class="hint" style="margin-bottom:10px;">Much senior hiring is a recruiter searching LinkedIn, not reading applications. Ten minutes here multiplies everything else.</p>
+    <ul style="margin:0; padding-left:20px; font-size:13.5px;">
+      <li><strong>LinkedIn headline:</strong> make sure it contains "${esc(job.title || 'the target title')}" — headline is the highest-weighted field in LinkedIn Recruiter search.</li>
+      <li><strong>LinkedIn Skills:</strong> add these from the posting: ${top.map(esc).join(', ')}.</li>
+      <li><strong>Open to Work:</strong> turn it on for recruiters only (visible to recruiters, hidden from your network) and make any small profile edit — recent activity ranks higher.</li>
+      <li><strong>One human at ${esc(job.company || 'the company')}:</strong> find a team member or recruiter on LinkedIn and send two sentences — genuine interest plus one specific qualification. A referral outperforms every keyword optimization combined.</li>
+      <li><strong>Portfolio link:</strong> only include one in your contact info if it's genuinely complete — studies show a thin profile/portfolio link performs worse than none at all.</li>
+    </ul>
+  </div>`;
 }
 
 function prepHTML(job) {
@@ -1337,6 +1356,8 @@ function atsAudit(version) {
   if (c.name && c.email && c.phone) add('pass', 'Contact info complete', 'Name, email, and phone present.');
   else add('fail', 'Contact info incomplete', 'ATS and recruiters need name, email, AND phone — fill them in on the Profile tab.');
   if (c.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) add('warn', 'Email looks off', `"${c.email}" may not be a valid address.`);
+
+  if (!c.linkedin?.trim()) add('warn', 'No LinkedIn URL in contact info', 'Much senior hiring is outbound sourcing. Add it once your profile is complete — a comprehensive profile link measurably lifts callbacks, but a bare-bones one performs worse than none.');
 
   // Summary
   if (!r.summary?.trim()) add('warn', 'No professional summary', 'A 2–3 sentence summary with the target job title helps recruiter searches.');
