@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ResumeForge — Tailor. Score. Apply.</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --border: #e2e5ea;
+    --text: #1c2330;
+    --muted: #626c7d;
+    --accent: #2557d6;
+    --accent-soft: #e8efff;
+    --green: #1a7f4b;
+    --green-soft: #e2f5ea;
+    --amber: #9a6700;
+    --amber-soft: #fff3d6;
+    --red: #b42318;
+    --red-soft: #fde8e6;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(16,24,40,.07), 0 1px 2px rgba(16,24,40,.05);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.5;
+  }
+  header.app-header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 0 20px; display: flex; align-items: center; gap: 24px;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .brand { font-weight: 700; font-size: 17px; padding: 14px 0; letter-spacing: -.2px; }
+  .brand span { color: var(--accent); }
+  nav.tabs { display: flex; gap: 4px; flex: 1; }
+  nav.tabs button {
+    background: none; border: none; font: inherit; cursor: pointer;
+    padding: 16px 14px; color: var(--muted); font-weight: 600;
+    border-bottom: 2.5px solid transparent; margin-bottom: -1px;
+  }
+  nav.tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+  nav.tabs button:hover { color: var(--text); }
+  .header-actions { display: flex; gap: 8px; }
+
+  main { max-width: 1160px; margin: 0 auto; padding: 24px 20px 80px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  h2 { font-size: 20px; margin: 0 0 4px; letter-spacing: -.3px; }
+  h3 { font-size: 15px; margin: 0 0 10px; }
+  .sub { color: var(--muted); font-size: 13.5px; margin: 0 0 20px; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow);
+    margin-bottom: 16px;
+  }
+  .card h3 { display: flex; align-items: center; justify-content: space-between; }
+
+  label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=email], input[type=date], input[type=month], textarea, select {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px;
+    font: inherit; font-size: 14px; color: var(--text); background: #fff;
+  }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 70px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .field { margin-bottom: 12px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  button.btn {
+    font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+    padding: 8px 14px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text);
+  }
+  button.btn:hover { background: #f1f3f6; }
+  button.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.btn.primary:hover { background: #1d47b8; }
+  button.btn.danger { color: var(--red); }
+  button.btn.small { padding: 4px 10px; font-size: 12.5px; }
+  button.btn.ghost { border-color: transparent; background: none; color: var(--muted); }
+  button.btn.ghost:hover { color: var(--text); background: #f1f3f6; }
+
+  .item-card {
+    border: 1px solid var(--border); border-radius: 8px; padding: 14px;
+    margin-bottom: 12px; background: #fbfcfe;
+  }
+  .item-card .item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 8px; }
+  .item-card .item-head .title { font-weight: 700; font-size: 14px; flex: 1; }
+  .item-actions { display: flex; gap: 4px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--accent-soft); color: var(--accent);
+    border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 600;
+  }
+  .chip button { background: none; border: none; cursor: pointer; color: inherit; font-size: 14px; padding: 0; line-height: 1; }
+  .chip.found { background: var(--green-soft); color: var(--green); }
+  .chip.missing { background: var(--red-soft); color: var(--red); cursor: pointer; border: 1px dashed rgba(180,35,24,.4); }
+  .chip.missing:hover { background: #fbd9d5; }
+
+  /* Jobs layout */
+  .jobs-layout { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
+  .job-list-item {
+    padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 8px; cursor: pointer; background: var(--surface);
+  }
+  .job-list-item:hover { border-color: #c6cdd8; }
+  .job-list-item.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .job-list-item .jt { font-weight: 700; font-size: 14px; }
+  .job-list-item .jc { color: var(--muted); font-size: 13px; }
+  .job-list-item .meta { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+  .status-badge { font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+  .status-saved      { background: #eef0f3; color: var(--muted); }
+  .status-applied    { background: var(--accent-soft); color: var(--accent); }
+  .status-interview  { background: var(--amber-soft); color: var(--amber); }
+  .status-offer      { background: var(--green-soft); color: var(--green); }
+  .status-rejected   { background: var(--red-soft); color: var(--red); }
+  .mini-score { font-size: 12px; font-weight: 700; color: var(--muted); }
+
+  /* Score gauge */
+  .score-row { display: flex; align-items: center; gap: 20px; }
+  .score-ring { position: relative; width: 92px; height: 92px; flex-shrink: 0; }
+  .score-ring svg { transform: rotate(-90deg); }
+  .score-ring .val {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 800;
+  }
+  .score-desc { flex: 1; font-size: 13.5px; color: var(--muted); }
+  .score-desc strong { color: var(--text); }
+
+  .kw-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px; }
+  .kw-col h4 { margin: 0 0 6px; font-size: 13px; }
+  .kw-col h4.ok { color: var(--green); } .kw-col h4.miss { color: var(--red); }
+
+  /* ATS checklist */
+  .check-item { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f0f2f5; font-size: 13.5px; }
+  .check-item:last-child { border-bottom: none; }
+  .check-icon { flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
+  .check-pass .check-icon { background: var(--green-soft); color: var(--green); }
+  .check-warn .check-icon { background: var(--amber-soft); color: var(--amber); }
+  .check-fail .check-icon { background: var(--red-soft); color: var(--red); }
+  .check-item .ct { font-weight: 600; }
+  .check-item .cd { color: var(--muted); font-size: 12.5px; }
+
+  /* Preview layout */
+  .preview-layout { display: grid; grid-template-columns: 1fr 340px; gap: 16px; align-items: start; }
+  .resume-sheet {
+    background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 48px 54px; min-height: 700px;
+  }
+
+  /* ===== Resume document styles (screen preview AND print) ===== */
+  .resume-doc { font-family: Calibri, Carlito, "Segoe UI", Arial, sans-serif; color: #111; font-size: 10.6pt; line-height: 1.38; }
+  .resume-doc .r-name { font-size: 19pt; font-weight: 700; letter-spacing: .3px; margin: 0; }
+  .resume-doc .r-contact { font-size: 10pt; margin: 3pt 0 0; color: #222; }
+  .resume-doc .r-sec { font-size: 11pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1.2pt solid #333; padding-bottom: 2pt; margin: 13pt 0 6pt; }
+  .resume-doc .r-summary { margin: 0; }
+  .resume-doc .r-job { margin-bottom: 9pt; }
+  .resume-doc .r-job-head { display: flex; justify-content: space-between; gap: 12px; font-weight: 700; }
+  .resume-doc .r-job-sub { display: flex; justify-content: space-between; gap: 12px; font-style: italic; font-size: 10pt; color: #222; }
+  .resume-doc ul { margin: 3pt 0 0; padding-left: 16pt; }
+  .resume-doc li { margin-bottom: 2pt; }
+  .resume-doc .r-skills { margin: 0; }
+  .resume-doc .r-edu { margin-bottom: 5pt; }
+
+  details.help { margin-bottom: 16px; }
+  details.help summary { cursor: pointer; font-weight: 600; color: var(--accent); font-size: 13.5px; }
+  details.help .card { margin-top: 10px; font-size: 13.5px; }
+  details.help ul { margin: 6px 0; padding-left: 20px; }
+
+  .empty-state { text-align: center; color: var(--muted); padding: 48px 20px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .spacer { flex: 1; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: #fff; padding: 10px 20px; border-radius: 8px;
+    font-size: 13.5px; font-weight: 600; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 100;
+  }
+  .toast.show { opacity: 1; }
+
+  #print-area { display: none; }
+
+  @media print {
+    body * { visibility: hidden; }
+    header.app-header, main { display: none; }
+    #print-area { display: block !important; visibility: visible; position: absolute; left: 0; top: 0; width: 100%; }
+    #print-area * { visibility: visible; }
+    @page { margin: 0.55in 0.65in; size: letter; }
+  }
+
+  @media (max-width: 900px) {
+    .jobs-layout, .preview-layout, .kw-cols { grid-template-columns: 1fr; }
+    .grid2, .grid3 { grid-template-columns: 1fr; }
+    .resume-sheet { padding: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">Resume<span>Forge</span></div>
+  <nav class="tabs">
+    <button data-tab="profile" class="active">1 · Master Profile</button>
+    <button data-tab="jobs">2 · Jobs &amp; Tailoring</button>
+    <button data-tab="preview">3 · Preview &amp; Export</button>
+  </nav>
+  <div class="header-actions">
+    <button class="btn small" data-action="export-json" title="Download a backup of everything">Backup</button>
+    <button class="btn small" data-action="import-json" title="Restore from a backup file">Restore</button>
+    <input type="file" id="import-file" accept=".json" style="display:none">
+  </div>
+</header>
+
+<main>
+
+  <!-- ============ PROFILE TAB ============ -->
+  <section class="tab-panel active" id="panel-profile">
+    <h2>Master Profile</h2>
+    <p class="sub">Enter everything once — every job, every accomplishment, even ones you might cut. Each application starts from this and gets tailored down. Everything saves automatically and never leaves this computer.</p>
+
+    <details class="help">
+      <summary>How applicant tracking systems (ATS) actually work — worth 2 minutes</summary>
+      <div class="card">
+        <p><strong>The truth most resume services won't tell you:</strong> the majority of ATS don't auto-reject anyone. They're databases. A recruiter types search terms (usually words straight from their own job posting) and resumes that contain those words rank higher. Resumes that parse badly or lack the words are effectively invisible — not "rejected," just never seen.</p>
+        <p>So the winning strategy is simple and this tool is built around it:</p>
+        <ul>
+          <li><strong>Mirror the posting's exact words.</strong> If they say "patient scheduling," write "patient scheduling," not "coordinated appointments." The analyzer finds these words for you.</li>
+          <li><strong>Use dead-simple formatting.</strong> One column, standard headings, no tables, no text boxes, no graphics, no headers/footers. Every export from this tool is already ATS-safe.</li>
+          <li><strong>Put the target job title in your summary</strong> — recruiters search titles constantly.</li>
+          <li><strong>Apply within the first few days</strong> of a posting going up. Recency beats almost everything.</li>
+          <li><strong>Quantify.</strong> "Managed schedules for a 40-person team" beats "responsible for scheduling."</li>
+        </ul>
+      </div>
+    </details>
+
+    <div class="card">
+      <h3>Contact</h3>
+      <div class="grid2">
+        <div class="field"><label>Full name</label><input type="text" data-path="contact.name" placeholder="Jane Doe"></div>
+        <div class="field"><label>Email</label><input type="email" data-path="contact.email" placeholder="jane@email.com"></div>
+        <div class="field"><label>Phone</label><input type="text" data-path="contact.phone" placeholder="(555) 123-4567"></div>
+        <div class="field"><label>City, State</label><input type="text" data-path="contact.location" placeholder="Austin, TX"></div>
+        <div class="field"><label>LinkedIn (optional)</label><input type="text" data-path="contact.linkedin" placeholder="linkedin.com/in/janedoe"></div>
+        <div class="field"><label>Website / portfolio (optional)</label><input type="text" data-path="contact.website" placeholder=""></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Professional Summary</h3>
+      <textarea data-path="summary" rows="3" placeholder="2–3 sentences: who you are professionally, years of experience, biggest strengths. You'll tailor this per job later."></textarea>
+      <p class="hint">Tip: include the job title you're targeting — recruiters search by title.</p>
+    </div>
+
+    <div class="card">
+      <h3>Skills <button class="btn small" data-action="focus-skill">+ Add</button></h3>
+      <input type="text" id="skill-input" placeholder="Type a skill and press Enter (e.g. Microsoft Excel, patient scheduling, inventory management)">
+      <div class="chips" id="skills-chips"></div>
+    </div>
+
+    <div class="card">
+      <h3>Work Experience <button class="btn small primary" data-action="add-exp">+ Add job</button></h3>
+      <div id="exp-list"></div>
+    </div>
+
+    <div class="card">
+      <h3>Education <button class="btn small primary" data-action="add-edu">+ Add</button></h3>
+      <div id="edu-list"></div>
+    </div>
+
+    <div class="card">
+      <h3>Certifications &amp; Licenses</h3>
+      <textarea data-path="certifications" rows="2" placeholder="One per line, e.g.:&#10;Certified Medical Assistant (CMA) — 2022&#10;CPR/BLS Certification — current"></textarea>
+    </div>
+  </section>
+
+  <!-- ============ JOBS TAB ============ -->
+  <section class="tab-panel" id="panel-jobs">
+    <h2>Jobs &amp; Tailoring</h2>
+    <p class="sub">Add a job you want to apply for, paste the full posting, and tailor your resume to it. The match score updates live as you edit.</p>
+
+    <div class="jobs-layout">
+      <div>
+        <button class="btn primary" data-action="add-job" style="width:100%; margin-bottom:12px;">+ New job application</button>
+        <div id="job-list"></div>
+      </div>
+      <div id="job-detail"></div>
+    </div>
+  </section>
+
+  <!-- ============ PREVIEW TAB ============ -->
+  <section class="tab-panel" id="panel-preview">
+    <h2>Preview &amp; Export</h2>
+    <p class="sub">This is exactly what gets exported: a single-column, standard-heading layout that every ATS can parse cleanly.</p>
+
+    <div class="toolbar">
+      <label style="margin:0;">Resume version:</label>
+      <select id="preview-select" style="width:auto; min-width:260px;"></select>
+      <span class="spacer"></span>
+      <button class="btn" data-action="copy-text">Copy as plain text</button>
+      <button class="btn" data-action="download-txt">Download .txt</button>
+      <button class="btn" data-action="download-doc">Download Word (.doc)</button>
+      <button class="btn primary" data-action="print-pdf">Save as PDF</button>
+    </div>
+    <p class="hint" id="filename-hint" style="margin-bottom:14px;"></p>
+
+    <div class="preview-layout">
+      <div class="resume-sheet"><div id="resume-preview" class="resume-doc"></div></div>
+      <div>
+        <div class="card" id="preview-score-card"></div>
+        <div class="card">
+          <h3>ATS &amp; Quality Audit</h3>
+          <div id="ats-checks"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="print-area" class="resume-doc"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+/* ================================================================
+   DATA & STATE
+================================================================ */
+const STORE_KEY = 'resumeforge_v1';
+
+const uid = () => 'id' + Math.random().toString(36).slice(2, 10);
+
+const defaultState = () => ({
+  profile: {
+    contact: { name: '', email: '', phone: '', location: '', linkedin: '', website: '' },
+    summary: '',
+    skills: [],
+    experience: [],   // {id,title,company,location,start,end,current,bullets:[]}
+    education: [],    // {id,degree,school,location,gradDate}
+    certifications: ''
+  },
+  jobs: [],           // {id,title,company,jd,status,dateApplied,notes,createdAt,tailored:{summary,skills:[],experience:[{expId,include,bullets:[]}]},analysis:null}
+  ui: { selectedJob: null, previewTarget: 'master' }
+});
+
+let state = load();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      const s = JSON.parse(raw);
+      // merge with defaults for forward-compat
+      return Object.assign(defaultState(), s, { ui: Object.assign(defaultState().ui, s.ui || {}) });
+    }
+  } catch (e) { console.warn('load failed', e); }
+  return defaultState();
+}
+
+let saveTimer = null;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+    catch (e) { toast('⚠ Could not save — storage full?'); }
+  }, 250);
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ================================================================
+   KEYWORD ANALYSIS ENGINE
+================================================================ */
+
+// Curated multi-word & single-word skills across common fields. Multi-word
+// terms are matched as phrases, which generic frequency analysis would miss.
+const SKILL_DICT = [
+  // Office / admin
+  'microsoft office','microsoft excel','microsoft word','microsoft outlook','powerpoint','google workspace','google sheets','google docs',
+  'data entry','calendar management','scheduling','appointment scheduling','travel arrangements','expense reports','office management',
+  'front desk','multi-line phone','filing','record keeping','records management','transcription','typing','administrative support',
+  'executive support','meeting coordination','document preparation','proofreading','editing','minute taking','office administration',
+  // Customer service / retail / hospitality
+  'customer service','customer support','customer satisfaction','client relations','conflict resolution','point of sale','pos systems',
+  'cash handling','cash register','upselling','cross-selling','merchandising','visual merchandising','inventory management','inventory control',
+  'stocking','loss prevention','order fulfillment','returns processing','food safety','food service','servsafe','barista','hospitality',
+  'guest services','reservations','front of house','back of house','banquet','catering','housekeeping','concierge',
+  // Healthcare
+  'patient care','patient scheduling','patient intake','patient education','vital signs','phlebotomy','ekg','injections','medication administration',
+  'electronic health records','electronic medical records','ehr','emr','epic','cerner','meditech','hipaa','hipaa compliance','medical terminology',
+  'medical billing','medical coding','icd-10','cpt coding','insurance verification','prior authorization','charting','triage','infection control',
+  'cpr','bls','acls','first aid','care coordination','case management','home health','long-term care','assisted living','rehabilitation',
+  'nursing','registered nurse','licensed practical nurse','certified nursing assistant','medical assistant','dental assistant','pharmacy technician',
+  'telehealth','patient advocacy','clinical documentation','specimen collection','sterilization','wound care',
+  // Education / childcare
+  'lesson planning','curriculum development','classroom management','iep','special education','early childhood education','child development',
+  'tutoring','student assessment','parent communication','behavior management','differentiated instruction','esl','montessori',
+  // Sales / marketing
+  'sales','inside sales','outside sales','b2b sales','b2c sales','lead generation','cold calling','prospecting','account management',
+  'crm','salesforce','hubspot','pipeline management','quota','negotiation','closing','client retention','relationship building',
+  'digital marketing','social media marketing','social media management','content creation','content marketing','copywriting','seo',
+  'sem','email marketing','google analytics','google ads','facebook ads','brand management','market research','campaign management',
+  'influencer marketing','canva','adobe creative suite','photoshop','illustrator','indesign','video editing','graphic design',
+  // Finance / accounting / HR
+  'accounts payable','accounts receivable','bookkeeping','quickbooks','payroll','payroll processing','general ledger','reconciliation',
+  'bank reconciliation','financial reporting','budgeting','forecasting','auditing','tax preparation','invoicing','billing','collections',
+  'gaap','sap','oracle','netsuite','adp','workday','financial analysis','cost accounting','month-end close',
+  'recruiting','talent acquisition','onboarding','employee relations','benefits administration','hris','performance management',
+  'training and development','compliance','fmla','ada','eeo','hr policies','interviewing','background checks','open enrollment',
+  // Project / operations / logistics
+  'project management','project coordination','program management','agile','scrum','kanban','waterfall','pmp','jira','asana','trello',
+  'monday.com','smartsheet','microsoft project','stakeholder management','risk management','process improvement','lean','six sigma',
+  'continuous improvement','standard operating procedures','sops','kpi','kpis','vendor management','procurement','purchasing',
+  'supply chain','logistics','shipping','receiving','warehouse operations','forklift','osha','quality assurance','quality control',
+  'dispatching','route planning','fleet management','erp','operations management','facilities management',
+  // Tech / data
+  'sql','python','javascript','typescript','java','html','css','react','node.js','excel formulas','pivot tables','vlookup','macros',
+  'power bi','tableau','data analysis','data visualization','reporting','dashboards','a/b testing','api','git','aws','azure',
+  'troubleshooting','technical support','help desk','it support','active directory','networking','cybersecurity','ticketing systems',
+  'zendesk','servicenow','machine learning','automation',
+  // Legal
+  'legal research','paralegal','litigation support','contract review','contract management','e-discovery','westlaw','lexisnexis',
+  'legal writing','case management software','notary',
+  // Universal soft skills (recruiters do search these)
+  'communication','written communication','verbal communication','leadership','teamwork','collaboration','problem solving',
+  'time management','attention to detail','multitasking','organization','organizational skills','adaptability','critical thinking',
+  'decision making','interpersonal skills','work ethic','self-motivated','fast-paced environment','deadline-driven','bilingual','spanish',
+  'team leadership','coaching','mentoring','training','supervision','delegation','customer-focused','detail-oriented','prioritization'
+];
+
+const STOPWORDS = new Set(('a,an,the,and,or,but,if,then,else,for,to,of,in,on,at,by,with,from,as,is,are,was,were,be,been,being,have,has,had,do,does,did,will,would,should,could,can,may,might,must,shall,not,no,yes,this,that,these,those,it,its,we,our,you,your,they,their,them,he,she,his,her,i,me,my,who,whom,which,what,when,where,why,how,all,any,both,each,few,more,most,other,some,such,than,too,very,just,also,about,above,after,again,against,below,between,into,through,during,before,under,over,out,off,up,down,own,same,so,per,via,etc,eg,ie,'
++ 'job,work,role,position,candidate,candidates,applicant,applicants,apply,application,company,team,teams,employee,employees,employer,opportunity,opportunities,description,responsibilities,requirements,qualifications,preferred,required,must,ability,able,skills,skill,experience,experienced,years,year,including,include,includes,included,knowledge,strong,excellent,good,great,plus,bonus,benefits,salary,pay,hour,hourly,week,weekly,day,daily,month,monthly,full,part,time,shift,shifts,schedule,location,remote,hybrid,onsite,equal,diversity,disability,veteran,gender,race,religion,orientation,status,law,federal,state,local,click,link,please,visit,us,new,high,school,degree,bachelor,bachelors,master,masters,associate,associates,ged,perform,performs,performing,duties,duty,assigned,related,within,ensure,ensures,ensuring,provide,provides,providing,maintain,maintains,maintaining,assist,assists,assisting,support,supporting,help,helps,helping,other,others,various,general,using,use,used,uses,well,working,environment,looking,seeking,join,ideal,successful,demonstrated,proven,minimum,least,along,across,every,essential,functions,function,physical,lift,pounds,stand,walk,sit,reach,department,departments,manager,management,type,pm,am').split(','));
+
+function normText(s) {
+  return ' ' + String(s || '').toLowerCase()
+    .replace(/[‘’]/g, "'").replace(/[“”]/g, '"')
+    .replace(/[–—]/g, '-')
+    .replace(/[^a-z0-9+#./' -]/g, ' ')
+    .replace(/\s+/g, ' ') + ' ';
+}
+
+// Does normalized text contain the term (with light plural/suffix tolerance)?
+function textHasTerm(normTxt, term) {
+  const t = term.toLowerCase();
+  const escT = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp('(^|[^a-z0-9])' + escT + '(s|es|ing|ed)?([^a-z0-9]|$)', 'i');
+  return re.test(normTxt);
+}
+
+// Extract ranked keywords from a job description.
+function extractKeywords(jd) {
+  const norm = normText(jd);
+  if (norm.trim().length < 30) return [];
+  const found = new Map(); // term -> weight
+
+  // 1) Dictionary phrase matching (highest signal)
+  for (const term of SKILL_DICT) {
+    const escT = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp('(^|[^a-z0-9])' + escT + '(s|es)?([^a-z0-9]|$)', 'gi');
+    const matches = norm.match(re);
+    if (matches) {
+      const freq = matches.length;
+      const w = (2 + Math.min(freq, 4)) * (term.includes(' ') ? 1.35 : 1);
+      found.set(term, (found.get(term) || 0) + w);
+    }
+  }
+
+  // 2) Generic frequency analysis for domain terms not in the dictionary
+  const words = norm.trim().split(' ').filter(w => w.length > 2 && !STOPWORDS.has(w) && !/^\d+$/.test(w));
+  const uni = new Map(), bi = new Map();
+  for (let i = 0; i < words.length; i++) {
+    uni.set(words[i], (uni.get(words[i]) || 0) + 1);
+    if (i < words.length - 1) {
+      const bg = words[i] + ' ' + words[i + 1];
+      bi.set(bg, (bi.get(bg) || 0) + 1);
+    }
+  }
+  const covered = t => [...found.keys()].some(k => k.includes(t) || t.includes(k));
+  for (const [bg, f] of bi) if (f >= 2 && !covered(bg)) found.set(bg, (found.get(bg) || 0) + f * 1.5);
+  for (const [w, f] of uni) if (f >= 3 && w.length > 3 && !covered(w)) found.set(w, (found.get(w) || 0) + f * 0.9);
+
+  return [...found.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 28)
+    .map(([term, weight]) => ({ term, weight: Math.round(weight * 10) / 10 }));
+}
+
+// Build the full searchable text of a resume version.
+function resumeFullText(version) {
+  const r = buildResumeData(version);
+  const parts = [r.summary, r.skills.join(' '), r.certifications];
+  for (const e of r.experience) parts.push(e.title, e.company, e.bullets.join(' '));
+  for (const e of r.education) parts.push(e.degree, e.school);
+  return normText(parts.join(' '));
+}
+
+function scoreResume(version, keywords) {
+  if (!keywords || !keywords.length) return null;
+  const txt = resumeFullText(version);
+  let got = 0, total = 0;
+  const foundK = [], missingK = [];
+  for (const k of keywords) {
+    total += k.weight;
+    if (textHasTerm(txt, k.term)) { got += k.weight; foundK.push(k); }
+    else missingK.push(k);
+  }
+  return { score: Math.round((got / total) * 100), found: foundK, missing: missingK };
+}
+
+/* ================================================================
+   RESUME DATA RESOLUTION  (master vs. tailored-per-job)
+================================================================ */
+
+// version = 'master' or a job id → normalized resume content object
+function buildResumeData(version) {
+  const p = state.profile;
+  const base = {
+    contact: p.contact,
+    summary: p.summary,
+    skills: p.skills.slice(),
+    experience: p.experience.map(e => ({ ...e, bullets: e.bullets.slice() })),
+    education: p.education.slice(),
+    certifications: p.certifications
+  };
+  if (version === 'master') return base;
+  const job = state.jobs.find(j => j.id === version);
+  if (!job) return base;
+  const t = job.tailored;
+  return {
+    contact: p.contact,
+    summary: t.summary,
+    skills: t.skills.slice(),
+    experience: t.experience.filter(te => te.include).map(te => {
+      const master = p.experience.find(e => e.id === te.expId) || {};
+      return { ...master, bullets: te.bullets.slice() };
+    }),
+    education: p.education.slice(),
+    certifications: p.certifications
+  };
+}
+
+// Create a tailored copy from the master profile.
+function makeTailored() {
+  const p = state.profile;
+  return {
+    summary: p.summary,
+    skills: p.skills.slice(),
+    experience: p.experience.map(e => ({ expId: e.id, include: true, bullets: e.bullets.slice() }))
+  };
+}
+
+// When master experience list changes, sync new jobs into tailored copies.
+function syncTailored(job) {
+  const ids = new Set(job.tailored.experience.map(t => t.expId));
+  for (const e of state.profile.experience) {
+    if (!ids.has(e.id)) job.tailored.experience.push({ expId: e.id, include: true, bullets: e.bullets.slice() });
+  }
+  job.tailored.experience = job.tailored.experience.filter(t => state.profile.experience.some(e => e.id === t.expId));
+}
+
+/* ================================================================
+   RENDER — PROFILE
+================================================================ */
+function renderSkills() {
+  document.getElementById('skills-chips').innerHTML = state.profile.skills.map((s, i) =>
+    `<span class="chip">${esc(s)}<button data-action="del-skill" data-i="${i}" title="Remove">×</button></span>`).join('');
+}
+
+function renderExperience() {
+  const el = document.getElementById('exp-list');
+  if (!state.profile.experience.length) {
+    el.innerHTML = '<p class="hint">No jobs yet. Add every job from the last ~10–15 years, with as many accomplishment bullets as you can think of.</p>';
+    return;
+  }
+  el.innerHTML = state.profile.experience.map((e, i) => `
+    <div class="item-card">
+      <div class="item-head">
+        <span class="title">${esc(e.title) || 'Untitled role'}${e.company ? ' — ' + esc(e.company) : ''}</span>
+        <div class="item-actions">
+          <button class="btn small ghost" data-action="move-exp" data-id="${e.id}" data-dir="-1" ${i===0?'disabled':''}>↑</button>
+          <button class="btn small ghost" data-action="move-exp" data-id="${e.id}" data-dir="1" ${i===state.profile.experience.length-1?'disabled':''}>↓</button>
+          <button class="btn small ghost danger" data-action="del-exp" data-id="${e.id}">Delete</button>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Job title</label><input type="text" data-exp="${e.id}" data-f="title" value="${esc(e.title)}"></div>
+        <div class="field"><label>Company</label><input type="text" data-exp="${e.id}" data-f="company" value="${esc(e.company)}"></div>
+        <div class="field"><label>Location</label><input type="text" data-exp="${e.id}" data-f="location" value="${esc(e.location)}" placeholder="City, ST"></div>
+        <div class="field grid2" style="gap:8px;">
+          <div><label>Start</label><input type="text" data-exp="${e.id}" data-f="start" value="${esc(e.start)}" placeholder="Jun 2021"></div>
+          <div><label>End</label><input type="text" data-exp="${e.id}" data-f="end" value="${esc(e.end)}" placeholder="Present" ${e.current?'disabled':''}></div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Accomplishment bullets — one per line, start with an action verb, add numbers where you can</label>
+        <textarea data-exp="${e.id}" data-f="bullets" rows="4" placeholder="Processed 50+ customer orders daily with 99% accuracy&#10;Trained 6 new team members on POS and inventory systems">${esc(e.bullets.join('\n'))}</textarea>
+      </div>
+    </div>`).join('');
+}
+
+function renderEducation() {
+  const el = document.getElementById('edu-list');
+  if (!state.profile.education.length) {
+    el.innerHTML = '<p class="hint">Add degrees, diplomas, or relevant coursework.</p>';
+    return;
+  }
+  el.innerHTML = state.profile.education.map(e => `
+    <div class="item-card">
+      <div class="item-head">
+        <span class="title">${esc(e.degree) || 'Untitled'}</span>
+        <div class="item-actions"><button class="btn small ghost danger" data-action="del-edu" data-id="${e.id}">Delete</button></div>
+      </div>
+      <div class="grid3">
+        <div class="field"><label>Degree / diploma</label><input type="text" data-edu="${e.id}" data-f="degree" value="${esc(e.degree)}" placeholder="B.A. Communications"></div>
+        <div class="field"><label>School</label><input type="text" data-edu="${e.id}" data-f="school" value="${esc(e.school)}"></div>
+        <div class="field"><label>Year (optional)</label><input type="text" data-edu="${e.id}" data-f="gradDate" value="${esc(e.gradDate)}" placeholder="2018"></div>
+      </div>
+    </div>`).join('');
+}
+
+function renderProfile() {
+  document.querySelectorAll('[data-path]').forEach(inp => {
+    const path = inp.dataset.path.split('.');
+    let v = state.profile;
+    for (const k of path) v = v?.[k];
+    inp.value = v ?? '';
+  });
+  renderSkills(); renderExperience(); renderEducation();
+}
+
+/* ================================================================
+   RENDER — JOBS
+================================================================ */
+const STATUSES = ['saved', 'applied', 'interview', 'offer', 'rejected'];
+
+function renderJobList() {
+  const el = document.getElementById('job-list');
+  if (!state.jobs.length) {
+    el.innerHTML = '<div class="empty-state">No applications yet.<br>Click "New job application" to start.</div>';
+    return;
+  }
+  el.innerHTML = state.jobs.map(j => {
+    const score = j.analysis ? scoreResume(j.id, j.analysis.keywords) : null;
+    return `
+    <div class="job-list-item ${state.ui.selectedJob === j.id ? 'selected' : ''}" data-action="select-job" data-id="${j.id}">
+      <div class="jt">${esc(j.title) || 'Untitled role'}</div>
+      <div class="jc">${esc(j.company) || '—'}</div>
+      <div class="meta">
+        <span class="status-badge status-${j.status}">${j.status}</span>
+        ${score ? `<span class="mini-score">${score.score}% match</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function ringColor(score) { return score >= 75 ? 'var(--green)' : score >= 50 ? 'var(--amber)' : 'var(--red)'; }
+
+function scoreRingHTML(score) {
+  const r = 40, c = 2 * Math.PI * r, off = c - (score / 100) * c;
+  return `
+  <div class="score-ring">
+    <svg width="92" height="92" viewBox="0 0 92 92">
+      <circle cx="46" cy="46" r="${r}" fill="none" stroke="#eef0f3" stroke-width="9"/>
+      <circle cx="46" cy="46" r="${r}" fill="none" stroke="${ringColor(score)}" stroke-width="9"
+        stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}"/>
+    </svg>
+    <div class="val" style="color:${ringColor(score)}">${score}%</div>
+  </div>`;
+}
+
+function analysisHTML(job) {
+  if (!job.analysis) return '';
+  const res = scoreResume(job.id, job.analysis.keywords);
+  if (!res) return '';
+  const verdict = res.score >= 75
+    ? '<strong>Strong match.</strong> This resume speaks the posting’s language — good to export.'
+    : res.score >= 50
+      ? '<strong>Getting there.</strong> Click the red keywords below that honestly apply to add them, and work others into your bullets.'
+      : '<strong>Needs tailoring.</strong> A recruiter searching these terms won’t surface this resume yet. Add every missing keyword that truthfully applies.';
+  return `
+  <div class="card">
+    <h3>Match score against this posting</h3>
+    <div class="score-row">${scoreRingHTML(res.score)}<div class="score-desc">${verdict}<br><span class="hint">Score = how much of the posting's weighted keyword list your tailored resume covers.</span></div></div>
+    <div class="kw-cols">
+      <div class="kw-col">
+        <h4 class="ok">✓ In your resume (${res.found.length})</h4>
+        <div class="chips">${res.found.map(k => `<span class="chip found">${esc(k.term)}</span>`).join('') || '<span class="hint">None yet</span>'}</div>
+      </div>
+      <div class="kw-col">
+        <h4 class="miss">✗ Missing — click to add to Skills (${res.missing.length})</h4>
+        <div class="chips">${res.missing.map(k => `<span class="chip missing" data-action="add-missing" data-job="${job.id}" data-term="${esc(k.term)}" title="Add to this job's skills">+ ${esc(k.term)}</span>`).join('') || '<span class="hint">Nothing missing 🎉</span>'}</div>
+        <p class="hint">Only add skills she genuinely has — lying gets caught in interviews. For skills shown in her work, weave the exact phrase into a bullet instead.</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderJobDetail() {
+  const el = document.getElementById('job-detail');
+  const job = state.jobs.find(j => j.id === state.ui.selectedJob);
+  if (!job) {
+    el.innerHTML = '<div class="card empty-state">Select or create a job application on the left.<br><br>Paste the <strong>entire job posting</strong> — requirements, responsibilities, everything. More text = better keyword analysis.</div>';
+    return;
+  }
+  syncTailored(job);
+  const p = state.profile;
+  el.innerHTML = `
+    <div class="card">
+      <div class="toolbar" style="margin-bottom:12px;">
+        <h3 style="margin:0;">Application details</h3>
+        <span class="spacer"></span>
+        <button class="btn small ghost danger" data-action="del-job" data-id="${job.id}">Delete application</button>
+      </div>
+      <div class="grid3">
+        <div class="field"><label>Job title</label><input type="text" data-job="${job.id}" data-f="title" value="${esc(job.title)}"></div>
+        <div class="field"><label>Company</label><input type="text" data-job="${job.id}" data-f="company" value="${esc(job.company)}"></div>
+        <div class="field"><label>Status</label>
+          <select data-job="${job.id}" data-f="status">${STATUSES.map(s => `<option ${job.status===s?'selected':''}>${s}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="field"><label>Notes (contact names, dates, follow-ups)</label><textarea data-job="${job.id}" data-f="notes" rows="2">${esc(job.notes)}</textarea></div>
+      <div class="field">
+        <label>Paste the full job posting here</label>
+        <textarea data-job="${job.id}" data-f="jd" rows="8" placeholder="Paste everything: about the role, responsibilities, requirements, qualifications...">${esc(job.jd)}</textarea>
+      </div>
+      <button class="btn primary" data-action="analyze" data-id="${job.id}">Analyze posting &amp; score my resume</button>
+    </div>
+    <div id="analysis-zone">${analysisHTML(job)}</div>
+    <div class="card">
+      <h3>Tailored resume for this job</h3>
+      <p class="hint" style="margin-bottom:12px;">Started as a copy of your master profile. Edits here only affect this application. Work the posting's exact wording into the summary and bullets, then check Preview &amp; Export.</p>
+      <div class="field">
+        <label>Tailored summary</label>
+        <textarea data-jobt="${job.id}" data-f="summary" rows="3">${esc(job.tailored.summary)}</textarea>
+      </div>
+      <div class="field">
+        <label>Tailored skills — one per line (missing keywords you click above land here)</label>
+        <textarea data-jobt="${job.id}" data-f="skills" rows="3">${esc(job.tailored.skills.join('\n'))}</textarea>
+      </div>
+      <label>Experience — untick roles to hide them for this job; reword bullets to mirror the posting</label>
+      ${job.tailored.experience.map(te => {
+        const m = p.experience.find(e => e.id === te.expId);
+        if (!m) return '';
+        return `
+        <div class="item-card" style="${te.include ? '' : 'opacity:.55;'}">
+          <div class="item-head">
+            <span class="title"><label style="display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--text);cursor:pointer;">
+              <input type="checkbox" data-jobinc="${job.id}" data-exp="${te.expId}" ${te.include?'checked':''}> ${esc(m.title)} — ${esc(m.company)}</label></span>
+          </div>
+          ${te.include ? `<textarea data-jobbul="${job.id}" data-exp="${te.expId}" rows="4">${esc(te.bullets.join('\n'))}</textarea>` : ''}
+        </div>`;
+      }).join('')}
+      <button class="btn" data-action="goto-preview" data-id="${job.id}" style="margin-top:6px;">Preview &amp; export this version →</button>
+    </div>`;
+}
+
+function renderJobs() { renderJobList(); renderJobDetail(); }
+
+/* ================================================================
+   RENDER — PREVIEW / RESUME DOCUMENT
+================================================================ */
+function resumeHTML(version) {
+  const r = buildResumeData(version);
+  const c = r.contact;
+  const contactBits = [c.location, c.phone, c.email, c.linkedin, c.website].filter(Boolean).map(esc).join(' &nbsp;•&nbsp; ');
+  const certs = (r.certifications || '').split('\n').map(s => s.trim()).filter(Boolean);
+  let h = `<h1 class="r-name">${esc(c.name) || 'Your Name'}</h1><p class="r-contact">${contactBits}</p>`;
+  if (r.summary?.trim()) h += `<div class="r-sec">Professional Summary</div><p class="r-summary">${esc(r.summary)}</p>`;
+  if (r.skills.length) h += `<div class="r-sec">Skills</div><p class="r-skills">${r.skills.map(esc).join(' &nbsp;•&nbsp; ')}</p>`;
+  if (r.experience.length) {
+    h += `<div class="r-sec">Professional Experience</div>`;
+    for (const e of r.experience) {
+      const dates = [e.start, e.current ? 'Present' : e.end].filter(Boolean).join(' – ');
+      h += `<div class="r-job">
+        <div class="r-job-head"><span>${esc(e.title)}</span><span>${esc(dates)}</span></div>
+        <div class="r-job-sub"><span>${esc(e.company)}${e.location ? ', ' + esc(e.location) : ''}</span></div>
+        ${e.bullets.filter(b => b.trim()).length ? '<ul>' + e.bullets.filter(b => b.trim()).map(b => `<li>${esc(b)}</li>`).join('') + '</ul>' : ''}
+      </div>`;
+    }
+  }
+  if (r.education.length) {
+    h += `<div class="r-sec">Education</div>`;
+    for (const e of r.education) {
+      h += `<div class="r-edu"><strong>${esc(e.degree)}</strong>${e.school ? ' — ' + esc(e.school) : ''}${e.gradDate ? ', ' + esc(e.gradDate) : ''}</div>`;
+    }
+  }
+  if (certs.length) {
+    h += `<div class="r-sec">Certifications</div><ul>${certs.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
+  }
+  return h;
+}
+
+function resumePlainText(version) {
+  const r = buildResumeData(version);
+  const c = r.contact;
+  const L = [];
+  L.push((c.name || 'Your Name').toUpperCase());
+  L.push([c.location, c.phone, c.email, c.linkedin, c.website].filter(Boolean).join(' | '));
+  const sec = t => { L.push(''); L.push(t.toUpperCase()); L.push('-'.repeat(t.length)); };
+  if (r.summary?.trim()) { sec('Professional Summary'); L.push(r.summary.trim()); }
+  if (r.skills.length) { sec('Skills'); L.push(r.skills.join(' • ')); }
+  if (r.experience.length) {
+    sec('Professional Experience');
+    for (const e of r.experience) {
+      const dates = [e.start, e.current ? 'Present' : e.end].filter(Boolean).join(' – ');
+      L.push('');
+      L.push(`${e.title} | ${e.company}${e.location ? ', ' + e.location : ''} | ${dates}`);
+      for (const b of e.bullets.filter(b => b.trim())) L.push('• ' + b.trim());
+    }
+  }
+  if (r.education.length) {
+    sec('Education');
+    for (const e of r.education) L.push(`${e.degree}${e.school ? ' — ' + e.school : ''}${e.gradDate ? ', ' + e.gradDate : ''}`);
+  }
+  const certs = (r.certifications || '').split('\n').map(s => s.trim()).filter(Boolean);
+  if (certs.length) { sec('Certifications'); certs.forEach(x => L.push('• ' + x)); }
+  return L.join('\n');
+}
+
+/* ================================================================
+   ATS AUDIT
+================================================================ */
+const ACTION_VERBS = new Set(('achieved,administered,analyzed,assembled,assessed,assisted,audited,authored,balanced,boosted,built,calculated,cared,chaired,coached,collaborated,collected,communicated,completed,conducted,coordinated,counseled,created,cut,decreased,delivered,designed,developed,diagnosed,directed,dispatched,documented,drove,earned,edited,educated,enhanced,ensured,established,evaluated,exceeded,executed,expanded,expedited,facilitated,filed,forecasted,generated,grew,guided,handled,hired,identified,implemented,improved,increased,initiated,inspected,installed,instructed,interviewed,launched,led,maintained,managed,mentored,monitored,negotiated,onboarded,operated,ordered,organized,oversaw,performed,planned,prepared,presented,processed,procured,produced,provided,ran,ranked,rebuilt,received,recommended,reconciled,recorded,recruited,reduced,repaired,reported,researched,resolved,responded,restocked,reviewed,revised,saved,scheduled,screened,secured,served,serviced,shipped,simplified,sold,solved,spearheaded,staffed,standardized,streamlined,strengthened,supervised,supported,surpassed,taught,tracked,trained,transformed,treated,triaged,updated,upgraded,verified,won,wrote').split(','));
+
+function atsAudit(version) {
+  const r = buildResumeData(version);
+  const checks = [];
+  const add = (level, title, detail) => checks.push({ level, title, detail });
+
+  // Contact
+  const c = r.contact;
+  if (c.name && c.email && c.phone) add('pass', 'Contact info complete', 'Name, email, and phone present.');
+  else add('fail', 'Contact info incomplete', 'ATS and recruiters need name, email, AND phone — fill them in on the Profile tab.');
+  if (c.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) add('warn', 'Email looks off', `"${c.email}" may not be a valid address.`);
+
+  // Summary
+  if (!r.summary?.trim()) add('warn', 'No professional summary', 'A 2–3 sentence summary with the target job title helps recruiter searches.');
+  else if (r.summary.trim().split(/\s+/).length > 80) add('warn', 'Summary is long', 'Keep it to 2–3 sentences; recruiters skim.');
+  else add('pass', 'Summary present and concise', '');
+
+  // Skills
+  if (!r.skills.length) add('fail', 'No skills section', 'A dedicated Skills section is the #1 place ATS keyword searches hit.');
+  else if (r.skills.length < 6) add('warn', `Only ${r.skills.length} skills listed`, 'Aim for 8–15 relevant skills.');
+  else add('pass', `Skills section (${r.skills.length} skills)`, '');
+
+  // Experience
+  if (!r.experience.length) add('fail', 'No work experience', 'Add roles on the Profile tab.');
+  for (const e of r.experience) {
+    const name = `${e.title || 'Untitled'} @ ${e.company || '?'}`;
+    if (!e.start) add('warn', `Missing dates — ${name}`, 'ATS parse and recruiters check employment dates; use "Jun 2021" style.');
+    const bullets = e.bullets.filter(b => b.trim());
+    if (!bullets.length) add('warn', `No bullets — ${name}`, 'Every role needs 3–6 accomplishment bullets.');
+    else {
+      if (bullets.length > 8) add('warn', `${bullets.length} bullets — ${name}`, 'Trim to the 3–6 most relevant for this job.');
+      const noVerb = bullets.filter(b => !ACTION_VERBS.has(b.trim().split(/\s+/)[0]?.toLowerCase().replace(/[^a-z]/g, '')));
+      if (noVerb.length) add('warn', `${noVerb.length} bullet(s) don't start with an action verb — ${name}`, `e.g. "${noVerb[0].slice(0, 60)}…" — start with Managed, Processed, Led, Trained…`);
+      const quant = bullets.filter(b => /\d/.test(b));
+      if (bullets.length >= 2 && quant.length === 0) add('warn', `No numbers in bullets — ${name}`, 'Add quantities: team size, volume/day, %, $, time saved.');
+      const tooLong = bullets.filter(b => b.length > 230);
+      if (tooLong.length) add('warn', `Very long bullet(s) — ${name}`, 'Keep bullets to 1–2 lines.');
+    }
+  }
+
+  // Length
+  const words = resumePlainText(version).split(/\s+/).filter(Boolean).length;
+  if (words < 250) add('warn', `Resume is short (${words} words)`, 'Under ~250 words looks thin; add bullets and skills.');
+  else if (words > 900) add('warn', `Resume is long (${words} words)`, 'Over ~900 words usually means 3+ pages; cut to what matters for this job.');
+  else add('pass', `Good length (${words} words)`, 'Roughly 1–2 pages.');
+
+  // Format guarantees (inherent to this tool)
+  add('pass', 'ATS-safe formatting guaranteed', 'Single column, standard headings, no tables/graphics/headers — every export from this tool parses cleanly.');
+
+  // Keyword tie-in for tailored versions
+  if (version !== 'master') {
+    const job = state.jobs.find(j => j.id === version);
+    if (job?.analysis) {
+      const res = scoreResume(version, job.analysis.keywords);
+      if (res) {
+        if (res.score >= 75) add('pass', `Keyword match ${res.score}%`, 'Strong alignment with the posting.');
+        else if (res.score >= 50) add('warn', `Keyword match ${res.score}%`, `${res.missing.length} posting keywords still missing — see the Jobs tab.`);
+        else add('fail', `Keyword match only ${res.score}%`, 'Tailor this version on the Jobs tab before sending.');
+      }
+    } else add('warn', 'Posting not analyzed yet', 'Paste the job description and click Analyze on the Jobs tab.');
+  }
+
+  const order = { fail: 0, warn: 1, pass: 2 };
+  checks.sort((a, b) => order[a.level] - order[b.level]);
+  return checks;
+}
+
+function suggestedFilename(version, ext) {
+  const name = (state.profile.contact.name || 'Resume').trim().replace(/\s+/g, '-');
+  let suffix = 'Resume';
+  if (version !== 'master') {
+    const job = state.jobs.find(j => j.id === version);
+    if (job?.company) suffix = 'Resume-' + job.company.trim().replace(/\s+/g, '-');
+  }
+  return `${name}-${suffix}.${ext}`.replace(/[^A-Za-z0-9.-]/g, '');
+}
+
+function renderPreview() {
+  const sel = document.getElementById('preview-select');
+  const opts = [`<option value="master">Master resume (untailored)</option>`]
+    .concat(state.jobs.map(j => `<option value="${j.id}">${esc(j.title || 'Untitled')} — ${esc(j.company || '?')}</option>`));
+  sel.innerHTML = opts.join('');
+  if (![...sel.options].some(o => o.value === state.ui.previewTarget)) state.ui.previewTarget = 'master';
+  sel.value = state.ui.previewTarget;
+
+  const v = state.ui.previewTarget;
+  document.getElementById('resume-preview').innerHTML = resumeHTML(v);
+  document.getElementById('filename-hint').textContent =
+    'Suggested file name: ' + suggestedFilename(v, 'pdf') + '  (recruiters see file names — keep it clean)';
+
+  // Score card
+  const scoreCard = document.getElementById('preview-score-card');
+  if (v !== 'master') {
+    const job = state.jobs.find(j => j.id === v);
+    const res = job?.analysis ? scoreResume(v, job.analysis.keywords) : null;
+    scoreCard.style.display = '';
+    scoreCard.innerHTML = res
+      ? `<h3>Match score</h3><div class="score-row">${scoreRingHTML(res.score)}<div class="score-desc"><strong>${esc(job.title||'')} @ ${esc(job.company||'')}</strong><br>${res.found.length} of ${res.found.length + res.missing.length} posting keywords covered.</div></div>`
+      : `<h3>Match score</h3><p class="hint">Analyze the posting on the Jobs tab to see a score here.</p>`;
+  } else scoreCard.style.display = 'none';
+
+  // ATS checks
+  const checks = atsAudit(v);
+  const icons = { pass: '✓', warn: '!', fail: '✗' };
+  document.getElementById('ats-checks').innerHTML = checks.map(ch => `
+    <div class="check-item check-${ch.level}">
+      <div class="check-icon">${icons[ch.level]}</div>
+      <div><div class="ct">${esc(ch.title)}</div>${ch.detail ? `<div class="cd">${esc(ch.detail)}</div>` : ''}</div>
+    </div>`).join('');
+}
+
+/* ================================================================
+   EXPORTS
+================================================================ */
+function download(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+function exportDoc(version) {
+  // HTML-based .doc — opens in Word/Google Docs, save-as .docx from there.
+  const docHtml = `<!DOCTYPE html><html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>Resume</title>
+<style>
+  body { font-family: Calibri, Arial, sans-serif; font-size: 10.5pt; color:#111; line-height:1.35; margin: 0.6in 0.7in; }
+  h1 { font-size: 19pt; margin: 0; } .contact { font-size: 10pt; margin: 2pt 0 0; }
+  h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1pt solid #333; padding-bottom: 2pt; margin: 12pt 0 5pt; }
+  .r-job-head, .r-job-sub { } .r-job-head span, .r-job-sub span {}
+  ul { margin: 3pt 0; padding-left: 18pt; } li { margin-bottom: 2pt; }
+  .r-name { font-size: 19pt; font-weight:bold; } .r-contact { font-size: 10pt; }
+  .r-sec { font-size: 11pt; font-weight:bold; text-transform: uppercase; letter-spacing:1px; border-bottom:1pt solid #333; padding-bottom:2pt; margin:12pt 0 5pt; }
+  .r-job { margin-bottom: 8pt; } .r-job-head { font-weight: bold; } .r-job-sub { font-style: italic; font-size: 10pt; }
+  .r-job-head { display:block; } .r-job-head span:last-child { float:right; }
+</style></head><body>${resumeHTML(version)}</body></html>`;
+  download(suggestedFilename(version, 'doc'), docHtml, 'application/msword');
+  toast('Word file downloaded — open it and Save As .docx if a posting requires docx');
+}
+
+/* ================================================================
+   EVENT WIRING
+================================================================ */
+function switchTab(tab) {
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
+  if (tab === 'profile') renderProfile();
+  if (tab === 'jobs') renderJobs();
+  if (tab === 'preview') renderPreview();
+}
+
+document.querySelector('nav.tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-tab]');
+  if (b) switchTab(b.dataset.tab);
+});
+
+// Delegated input handling — writes to state without re-render (keeps focus)
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.path) {
+    const path = t.dataset.path.split('.');
+    let obj = state.profile;
+    for (let i = 0; i < path.length - 1; i++) obj = obj[path[i]];
+    obj[path[path.length - 1]] = t.value;
+  } else if (t.dataset.exp && t.dataset.f) {
+    const exp = state.profile.experience.find(x => x.id === t.dataset.exp);
+    if (exp) exp[t.dataset.f] = t.dataset.f === 'bullets' ? t.value.split('\n') : t.value;
+  } else if (t.dataset.edu && t.dataset.f) {
+    const ed = state.profile.education.find(x => x.id === t.dataset.edu);
+    if (ed) ed[t.dataset.f] = t.value;
+  } else if (t.dataset.job && t.dataset.f) {
+    const job = state.jobs.find(j => j.id === t.dataset.job);
+    if (job) {
+      job[t.dataset.f] = t.value;
+      if (t.dataset.f === 'title' || t.dataset.f === 'company' || t.dataset.f === 'status') renderJobList();
+      if (t.dataset.f === 'status' && t.value === 'applied' && !job.dateApplied) job.dateApplied = new Date().toISOString().slice(0, 10);
+    }
+  } else if (t.dataset.jobt && t.dataset.f) {
+    const job = state.jobs.find(j => j.id === t.dataset.jobt);
+    if (job) job.tailored[t.dataset.f] = t.dataset.f === 'skills' ? t.value.split('\n').map(s => s.trim()).filter(Boolean) : t.value;
+  } else if (t.dataset.jobbul && t.dataset.exp) {
+    const job = state.jobs.find(j => j.id === t.dataset.jobbul);
+    const te = job?.tailored.experience.find(x => x.expId === t.dataset.exp);
+    if (te) te.bullets = t.value.split('\n');
+  } else return;
+  save();
+});
+
+// Checkbox include-toggles
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.jobinc && t.dataset.exp) {
+    const job = state.jobs.find(j => j.id === t.dataset.jobinc);
+    const te = job?.tailored.experience.find(x => x.expId === t.dataset.exp);
+    if (te) { te.include = t.checked; save(); renderJobDetail(); }
+  }
+});
+
+// Skill entry
+document.getElementById('skill-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const v = e.target.value.trim();
+    if (v && !state.profile.skills.some(s => s.toLowerCase() === v.toLowerCase())) {
+      state.profile.skills.push(v);
+      save(); renderSkills();
+    }
+    e.target.value = '';
+  }
+});
+
+document.getElementById('preview-select').addEventListener('change', e => {
+  state.ui.previewTarget = e.target.value; save(); renderPreview();
+});
+
+document.getElementById('import-file').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!data.profile) throw new Error('not a ResumeForge backup');
+      state = Object.assign(defaultState(), data, { ui: Object.assign(defaultState().ui, data.ui || {}) });
+      save(); renderProfile(); renderJobs(); renderPreview();
+      toast('Backup restored ✓');
+    } catch (err) { toast('⚠ Could not read that file: ' + err.message); }
+  };
+  reader.readAsText(f);
+  e.target.value = '';
+});
+
+// Delegated click actions
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const a = el.dataset.action;
+
+  if (a === 'add-exp') {
+    state.profile.experience.push({ id: uid(), title: '', company: '', location: '', start: '', end: '', current: false, bullets: [] });
+    save(); renderExperience();
+  }
+  else if (a === 'del-exp') {
+    if (!confirm('Delete this job from your master profile? Tailored copies in existing applications keep their text until you delete them.')) return;
+    state.profile.experience = state.profile.experience.filter(x => x.id !== el.dataset.id);
+    save(); renderExperience();
+  }
+  else if (a === 'move-exp') {
+    const list = state.profile.experience;
+    const i = list.findIndex(x => x.id === el.dataset.id);
+    const j = i + Number(el.dataset.dir);
+    if (i >= 0 && j >= 0 && j < list.length) { [list[i], list[j]] = [list[j], list[i]]; save(); renderExperience(); }
+  }
+  else if (a === 'add-edu') {
+    state.profile.education.push({ id: uid(), degree: '', school: '', location: '', gradDate: '' });
+    save(); renderEducation();
+  }
+  else if (a === 'del-edu') {
+    state.profile.education = state.profile.education.filter(x => x.id !== el.dataset.id);
+    save(); renderEducation();
+  }
+  else if (a === 'del-skill') {
+    state.profile.skills.splice(Number(el.dataset.i), 1);
+    save(); renderSkills();
+  }
+  else if (a === 'focus-skill') document.getElementById('skill-input').focus();
+  else if (a === 'add-job') {
+    const job = { id: uid(), title: '', company: '', jd: '', status: 'saved', dateApplied: '', notes: '', createdAt: new Date().toISOString(), tailored: makeTailored(), analysis: null };
+    state.jobs.unshift(job);
+    state.ui.selectedJob = job.id;
+    save(); renderJobs();
+  }
+  else if (a === 'select-job') {
+    state.ui.selectedJob = el.dataset.id; save(); renderJobs();
+  }
+  else if (a === 'del-job') {
+    if (!confirm('Delete this application and its tailored resume?')) return;
+    state.jobs = state.jobs.filter(j => j.id !== el.dataset.id);
+    if (state.ui.selectedJob === el.dataset.id) state.ui.selectedJob = null;
+    save(); renderJobs();
+  }
+  else if (a === 'analyze') {
+    const job = state.jobs.find(j => j.id === el.dataset.id);
+    if (!job) return;
+    if ((job.jd || '').trim().length < 60) { toast('Paste the full job posting first — the more text, the better the analysis.'); return; }
+    job.analysis = { keywords: extractKeywords(job.jd), at: new Date().toISOString() };
+    save(); renderJobs();
+    toast('Analyzed — ' + job.analysis.keywords.length + ' keywords extracted');
+  }
+  else if (a === 'add-missing') {
+    const job = state.jobs.find(j => j.id === el.dataset.job);
+    const term = el.dataset.term;
+    if (job && term && !job.tailored.skills.some(s => s.toLowerCase() === term.toLowerCase())) {
+      job.tailored.skills.push(term);
+      save(); renderJobDetail();
+      toast(`Added "${term}" to this job's skills`);
+    }
+  }
+  else if (a === 'goto-preview') {
+    state.ui.previewTarget = el.dataset.id; save(); switchTab('preview');
+  }
+  else if (a === 'copy-text') {
+    navigator.clipboard.writeText(resumePlainText(state.ui.previewTarget))
+      .then(() => toast('Plain-text resume copied — paste into any online application form'))
+      .catch(() => toast('⚠ Copy failed — try the .txt download instead'));
+  }
+  else if (a === 'download-txt') {
+    download(suggestedFilename(state.ui.previewTarget, 'txt'), resumePlainText(state.ui.previewTarget), 'text/plain');
+  }
+  else if (a === 'download-doc') exportDoc(state.ui.previewTarget);
+  else if (a === 'print-pdf') {
+    document.getElementById('print-area').innerHTML = resumeHTML(state.ui.previewTarget);
+    toast('In the print dialog choose "Save as PDF"');
+    setTimeout(() => window.print(), 150);
+  }
+  else if (a === 'export-json') {
+    download('resumeforge-backup-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(state, null, 2), 'application/json');
+    toast('Backup downloaded — keep it somewhere safe');
+  }
+  else if (a === 'import-json') document.getElementById('import-file').click();
+});
+
+/* ================================================================
+   INIT
+================================================================ */
+renderProfile();
+renderJobs();
+renderPreview();
+</script>
+</body>
+</html>
