@@ -328,6 +328,20 @@
       </details>
 
       <details class="help">
+        <summary>Field-specific job boards — where the good postings show up first</summary>
+        <div class="card">
+          <p style="margin-top:0;">Niche boards often carry roles before (or instead of) the big aggregators, frequently with salary ranges attached. For content design / UX writing / knowledge management:</p>
+          <ul>
+            <li><a href="https://jobs.uxcontent.com" target="_blank" rel="noopener">UX Content Collective job board</a> — plus their jobs newsletter, widely cited as the best single source</li>
+            <li><a href="https://contentandux.org" target="_blank" rel="noopener">Content + UX Slack</a> (~8,000 members) — job channel requires salary ranges on postings; also the referral/community channel</li>
+            <li><a href="https://uxwritinghub.com/job-board/" target="_blank" rel="noopener">UX Writing Hub job board</a></li>
+            <li><a href="https://workingincontent.com" target="_blank" rel="noopener">Working in Content</a> — content ops / content strategy skew</li>
+          </ul>
+          <p class="hint" style="margin-bottom:0;">Adjacent titles worth searching everywhere (growing demand, same skills): conversation designer, AI content designer, knowledge base manager, content operations manager, technical writer, service designer.</p>
+        </div>
+      </details>
+
+      <details class="help">
         <summary>📎 The browser button — grade any posting on Indeed, LinkedIn, anywhere</summary>
         <div class="card" id="bookmarklet-zone"></div>
       </details>
@@ -1018,13 +1032,17 @@ const KNOCKOUT_PATTERNS = [
   { label: 'Degree requirement', re: /(bachelor'?s?|master'?s?|ph\.?d|b\.s\.|m\.s\.)[^.\n]{0,40}(required|must)|(required|must)[^.\n]{0,40}(bachelor|master|degree)/i },
   { label: 'License / certification required', re: /(license|licensure|certification|certified)[^.\n]{0,30}(required|must)|(required|must)[^.\n]{0,40}(license|certification)|driver'?s license|\bcdl\b/i },
   { label: 'Background / drug screening', re: /(background check|drug (screen|test))/i },
+  { label: 'Portfolio required', re: /portfolio[^.\n]{0,40}(required|must|link|submit)|(submit|include|provide|share)[^.\n]{0,30}portfolio/i,
+    tip: 'For content/design roles the portfolio decides the interview — make sure yours is linked and current before applying.' },
+  { label: 'Salary expectations asked', re: /(salary (expectations?|requirements?)|desired (salary|compensation)|pay expectations)/i,
+    tip: 'Give a researched range, never a single number — and at phone screens, ask for their budgeted range first.' },
   { label: 'Schedule / shift / travel', re: /(night shift|weekends? required|overtime required|travel (up to|required|\d+%)|rotating shifts)/i }
 ];
 function detectKnockouts(jd) {
   const out = [];
   for (const k of KNOCKOUT_PATTERNS) {
     const m = String(jd || '').match(k.re);
-    if (m) out.push({ label: k.label, excerpt: m[0].trim().slice(0, 110) });
+    if (m) out.push({ label: k.label, excerpt: m[0].trim().slice(0, 110), tip: k.tip || '' });
   }
   return out;
 }
@@ -1035,7 +1053,7 @@ function knockoutHTML(job) {
   <div class="card" style="border-color:var(--amber); background:var(--amber-soft);" id="knockout-panel">
     <h3 style="color:var(--amber);">⚠ Possible knockout requirements — check these before anything else</h3>
     <p class="hint" style="margin:0 0 8px;">Screening questions and hard eligibility filters are what actually auto-reject applications. No keyword tailoring overcomes them — make sure each is true for you before investing time here.</p>
-    ${ks.map(k => `<div class="check-item"><div class="check-icon" style="background:#fff;color:var(--amber);">!</div><div><div class="ct">${esc(k.label)}</div><div class="cd">“…${esc(k.excerpt)}…”</div></div></div>`).join('')}
+    ${ks.map(k => `<div class="check-item"><div class="check-icon" style="background:#fff;color:var(--amber);">!</div><div><div class="ct">${esc(k.label)}</div><div class="cd">“…${esc(k.excerpt)}…”${k.tip ? '<br>' + esc(k.tip) : ''}</div></div></div>`).join('')}
   </div>`;
 }
 
@@ -1063,7 +1081,7 @@ function analysisHTML(job) {
         </svg>
         <div class="val" style="color:${ringColor(g.pct)}">${g.letter}</div>
       </div>
-      <div class="score-desc"><strong style="font-size:16px;">${g.pct}%</strong> overall<br>${verdict}</div>
+      <div class="score-desc"><strong style="font-size:16px;">${g.pct}%</strong> overall<br>${verdict}<br><span class="hint">In portfolio-driven fields (design, content, writing) this grade gets you to the portfolio review — the portfolio decides the interview.</span></div>
     </div>
     ${gradeBarsHTML(g)}
     <div class="kw-cols">
@@ -1214,11 +1232,11 @@ function beyondHTML(job) {
     <h3>Beyond the resume — where senior candidates actually get found</h3>
     <p class="hint" style="margin-bottom:10px;">Much senior hiring is a recruiter searching LinkedIn, not reading applications. Ten minutes here multiplies everything else.</p>
     <ul style="margin:0; padding-left:20px; font-size:13.5px;">
-      <li><strong>LinkedIn headline:</strong> make sure it contains "${esc(job.title || 'the target title')}" — headline is the highest-weighted field in LinkedIn Recruiter search.</li>
-      <li><strong>LinkedIn Skills:</strong> add these from the posting: ${top.map(esc).join(', ')}.</li>
-      <li><strong>Open to Work:</strong> turn it on for recruiters only (visible to recruiters, hidden from your network) and make any small profile edit — recent activity ranks higher.</li>
-      <li><strong>One human at ${esc(job.company || 'the company')}:</strong> find a team member or recruiter on LinkedIn and send two sentences — genuine interest plus one specific qualification. A referral outperforms every keyword optimization combined.</li>
-      <li><strong>Portfolio link:</strong> only include one in your contact info if it's genuinely complete — studies show a thin profile/portfolio link performs worse than none at all.</li>
+      <li><strong>LinkedIn headline &amp; title fields:</strong> Recruiter search hits the job-title fields and headline. Put "${esc(job.title || 'the target title')}" in your headline, and where honest, align past role titles with the searchable equivalent (e.g. a legacy internal title → the industry-standard one).</li>
+      <li><strong>LinkedIn Skills:</strong> add these from the posting — recruiters filter on the Skills section: ${top.map(esc).join(', ')}.</li>
+      <li><strong>Open to Work, recruiters-only:</strong> no public banner, list 3–4 target titles and locations. LinkedIn reports it roughly doubles recruiter outreach. Make any small profile edit too — Recruiter has recency filters.</li>
+      <li><strong>One human at ${esc(job.company || 'the company')}:</strong> ${job.company ? `<a href="https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(job.company)}" target="_blank" rel="noopener">search people at ${esc(job.company)}</a> — check for former colleagues first, then send` : 'find a team member or recruiter on LinkedIn and send'} two sentences: genuine interest plus one specific qualification. Referred candidates are a small share of applicants but a large share of hires — a referral outperforms every keyword optimization combined.</li>
+      <li><strong>Portfolio link:</strong> only include one in your contact info if it's genuinely complete — a thin portfolio link performs worse than none at all. For NDA-heavy work: anonymize the company, convert exact figures to percentages, recreate sanitized mockups, and password-protect per-application case studies. Process-over-screenshots case studies are explicitly accepted.</li>
     </ul>
   </div>`;
 }
@@ -1246,6 +1264,12 @@ function prepHTML(job) {
     <div class="chips">${topTerms.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>
     <h4 style="margin:14px 0 4px; font-size:13px;">Questions to expect</h4>
     <ul style="margin:0; padding-left:20px; font-size:13.5px;">${questions.map(q => `<li>${esc(q)}</li>`).join('')}</ul>
+    ${/portfolio|case stud|design (challenge|exercise)|writing (exercise|challenge|sample)/i.test(job.jd || '') ? `
+    <h4 style="margin:14px 0 4px; font-size:13px;">This role signals a portfolio walkthrough / exercise — prep for it</h4>
+    <ul style="margin:0; padding-left:20px; font-size:13.5px;">
+      <li><strong>Walkthrough structure (45–60 min):</strong> for each of 2–3 case studies — context → constraints → the decisions you made and why → measured outcome. Expect "why" questions on every choice.</li>
+      <li><strong>Take-home / live exercise:</strong> graded on process more than polish. Restate the problem, name your assumptions out loud, ask clarifying questions, show 2–3 options with the rationale for your pick.</li>
+    </ul>` : ''}
     <h4 style="margin:14px 0 4px; font-size:13px;">Your proof points — rehearse these as short stories (situation → what you did → result)</h4>
     ${proof.length ? `<ul style="margin:0; padding-left:20px; font-size:13.5px;">${proof.map(b => `<li>${esc(b)}</li>`).join('')}</ul>`
       : '<p class="hint">No quantified bullets yet — add numbers to your experience bullets and they\'ll show up here.</p>'}
@@ -1358,6 +1382,7 @@ function atsAudit(version) {
   if (c.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) add('warn', 'Email looks off', `"${c.email}" may not be a valid address.`);
 
   if (!c.linkedin?.trim()) add('warn', 'No LinkedIn URL in contact info', 'Much senior hiring is outbound sourcing. Add it once your profile is complete — a comprehensive profile link measurably lifts callbacks, but a bare-bones one performs worse than none.');
+  if (!c.website?.trim()) add('warn', 'No portfolio/website link', 'If your field expects a portfolio (design, content, writing), it decides interviews — ~89% of UX hiring managers review it, and reviewers spend most of their time there. Add the link once the portfolio is genuinely complete.');
 
   // Summary
   if (!r.summary?.trim()) add('warn', 'No professional summary', 'A 2–3 sentence summary with the target job title helps recruiter searches.');
@@ -1405,13 +1430,26 @@ function atsAudit(version) {
       const en = (e.current || /^present$/i.test(String(e.end || '').trim())) ? nowM : parseMY(e.end);
       return st !== null && en !== null && en >= st ? [st, en] : null;
     }).filter(Boolean).sort((a, b) => a[0] - b[0]);
-    if (spans.length >= 2) {
+    if (spans.length >= 1) {
       let covEnd = spans[0][1];
       for (let i = 1; i < spans.length; i++) {
         const [st, en] = spans[i];
         if (st - covEnd > 6) add('warn', `Employment gap of ~${st - covEnd} months`, 'Gaps over ~6 months are a commonly configured screening filter — a one-line explanation (caregiving, education, freelance) turns a hole into a chapter.');
         covEnd = Math.max(covEnd, en);
       }
+      // A gap that runs to the present is the urgent case — callbacks decline
+      // sharply with unemployment duration (most of the drop by ~8 months).
+      if (nowM - covEnd > 6) add('warn', `No current role for ~${nowM - covEnd} months`, 'Add a dated "2025 – Present" line now: contract or freelance work, volunteer content work, a certification in progress, or independent practice (portfolio building counts). Contract work also converts to full-time at referral-grade rates.');
+      // Seniority-screening mitigations (practitioner consensus)
+      const earliest = spans[0][0];
+      if (nowM - earliest > 12 * 16) add('warn', `History spans ~${Math.round((nowM - earliest) / 12)} years`, 'Standard practice is to detail ~15 years and compress older roles to a single line — it counters both age filtering and "wall of text" skimming.');
+    }
+  }
+  for (const e of r.education) {
+    const y = String(e.gradDate || '').match(/\b(19|20)\d\d\b/);
+    if (y && new Date().getFullYear() - Number(y[0]) > 20) {
+      add('warn', 'Old graduation year shown', 'Consider dropping graduation years older than ~20 years — a cheap counter to age screening (the degree still lists, just undated).');
+      break;
     }
   }
 
