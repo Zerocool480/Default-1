@@ -1,0 +1,13 @@
+{
+  "name": "resumeforge",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Private resume tailoring, grading, and job search — no dependencies, runs locally.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

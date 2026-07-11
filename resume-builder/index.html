@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ResumeForge — Tailor. Score. Apply.</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%84%3C/text%3E%3C/svg%3E">
 <style>
   :root {
     --bg: #f6f7f9;
@@ -134,6 +135,15 @@
   .score-desc { flex: 1; font-size: 13.5px; color: var(--muted); }
   .score-desc strong { color: var(--text); }
 
+  .gbars { margin-top: 14px; }
+  .gbar { display: grid; grid-template-columns: 150px 1fr 44px; gap: 10px; align-items: center; padding: 5px 0; font-size: 13px; }
+  .gbar .gname { font-weight: 600; color: var(--muted); }
+  .gbar .gtrack { height: 8px; background: #eef0f3; border-radius: 999px; overflow: hidden; }
+  .gbar .gfill { height: 100%; border-radius: 999px; }
+  .gbar .gpct { font-weight: 700; text-align: right; }
+  .gbar .gnote { grid-column: 2 / 4; font-size: 12px; color: var(--muted); margin-top: -2px; }
+  .chip .reqmark { font-size: 11px; opacity: .85; }
+
   .kw-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 14px; }
   .kw-col h4 { margin: 0 0 6px; font-size: 13px; }
   .kw-col h4.ok { color: var(--green); } .kw-col h4.miss { color: var(--red); }
@@ -208,8 +218,9 @@
   <div class="brand">Resume<span>Forge</span></div>
   <nav class="tabs">
     <button data-tab="profile" class="active">1 · Master Profile</button>
-    <button data-tab="jobs">2 · Jobs &amp; Tailoring</button>
-    <button data-tab="preview">3 · Preview &amp; Export</button>
+    <button data-tab="search">2 · Find Jobs</button>
+    <button data-tab="jobs">3 · Jobs &amp; Tailoring</button>
+    <button data-tab="preview">4 · Preview &amp; Export</button>
   </nav>
   <div class="header-actions">
     <button class="btn small" data-action="export-json" title="Download a backup of everything">Backup</button>
@@ -280,6 +291,56 @@
     </div>
   </section>
 
+  <!-- ============ FIND JOBS TAB ============ -->
+  <section class="tab-panel" id="panel-search">
+    <h2>Find Jobs</h2>
+    <p class="sub">Search multiple job boards at once — every result is auto-graded against your master resume so you apply where you'll actually rank. For Indeed &amp; LinkedIn (which have no public search APIs), use the browser button below: it beams any posting you're looking at straight into this app.</p>
+
+    <div class="card" id="search-offline" style="display:none; border-color: var(--amber); background: var(--amber-soft);">
+      <strong>Job search needs the app server.</strong> You've opened the file directly, which is fine for everything else — but searching job boards requires running ResumeForge as an app: double-click <code>Start ResumeForge.command</code> (Mac) or run <code>node server.js</code>, then use the address it prints.
+    </div>
+
+    <div class="card">
+      <div class="grid3">
+        <div class="field"><label>Keywords</label><input type="text" id="search-q" data-uifield="searchQ" placeholder="medical receptionist"></div>
+        <div class="field"><label>Location</label><input type="text" id="search-loc" data-uifield="searchLoc" placeholder="Austin, TX"></div>
+        <div class="field"><label>&nbsp;</label><button class="btn primary" data-action="run-search" style="width:100%;">Search all checked sources</button></div>
+      </div>
+      <div id="source-checks" style="display:flex; flex-wrap:wrap; gap:14px; margin:6px 0 4px;"></div>
+
+      <details class="help">
+        <summary>Job board connections &amp; free API keys</summary>
+        <div class="card">
+          <p style="margin-top:0;"><strong>Works immediately, no keys:</strong> Demo (sample data to try it), Remotive, Arbeitnow, RemoteOK (remote-work boards).</p>
+          <p><strong>The big aggregators</strong> cover most of what's posted on Indeed, Monster, CareerBuilder, etc. Each gives free API keys in ~2 minutes:</p>
+          <div class="grid2">
+            <div class="field"><label>Adzuna App ID — free at developer.adzuna.com</label><input type="text" data-keyfield="adzunaId"></div>
+            <div class="field"><label>Adzuna App Key</label><input type="text" data-keyfield="adzunaKey"></div>
+            <div class="field"><label>Jooble API key — free at jooble.org/api/about</label><input type="text" data-keyfield="joobleKey"></div>
+            <div class="field"><label>USAJobs email + key — developer.usajobs.gov</label>
+              <div class="grid2" style="gap:6px;"><input type="text" data-keyfield="usajobsEmail" placeholder="email"><input type="text" data-keyfield="usajobsKey" placeholder="key"></div>
+            </div>
+          </div>
+          <p class="hint">Keys are saved on this computer only. Indeed and LinkedIn shut down their public job APIs — no service has legitimate direct access; the honest route is the aggregators above plus the browser button for anything you find while browsing.</p>
+        </div>
+      </details>
+
+      <details class="help">
+        <summary>📎 The browser button — grade any posting on Indeed, LinkedIn, anywhere</summary>
+        <div class="card" id="bookmarklet-zone"></div>
+      </details>
+
+      <details class="help">
+        <summary>Why there's no "auto-apply" bot (and what we do instead)</summary>
+        <div class="card">
+          <p style="margin-top:0;">Bots that log into Indeed/LinkedIn and mass-apply violate their terms, get accounts banned, and some ATS flag bot-submitted applications. Blast-applying also performs worse than targeted applying — recruiters can tell.</p>
+          <p style="margin-bottom:0;">Instead, every tracked job gets an <strong>Apply Kit</strong>: one click opens the posting and puts your tailored resume and cover letter on the clipboard. A real, high-quality application takes about two minutes — and it's yours, not a bot's.</p>
+        </div>
+      </details>
+    </div>
+    <div id="search-results"></div>
+  </section>
+
   <!-- ============ JOBS TAB ============ -->
   <section class="tab-panel" id="panel-jobs">
     <h2>Jobs &amp; Tailoring</h2>
@@ -346,8 +407,9 @@ const defaultState = () => ({
     education: [],    // {id,degree,school,location,gradDate}
     certifications: ''
   },
-  jobs: [],           // {id,title,company,jd,status,dateApplied,notes,createdAt,tailored:{summary,skills:[],experience:[{expId,include,bullets:[]}]},analysis:null}
-  ui: { selectedJob: null, previewTarget: 'master' }
+  jobs: [],           // {id,title,company,jd,url,status,dateApplied,notes,coverLetter,createdAt,tailored:{summary,skills:[],experience:[{expId,include,bullets:[]}]},analysis:null}
+  keys: { adzunaId: '', adzunaKey: '', joobleKey: '', usajobsEmail: '', usajobsKey: '' },
+  ui: { selectedJob: null, previewTarget: 'master', searchQ: '', searchLoc: '', sources: ['demo'] }
 });
 
 let state = load();
@@ -358,7 +420,11 @@ function load() {
     if (raw) {
       const s = JSON.parse(raw);
       // merge with defaults for forward-compat
-      return Object.assign(defaultState(), s, { ui: Object.assign(defaultState().ui, s.ui || {}) });
+      const d = defaultState();
+      return Object.assign(d, s, {
+        ui: Object.assign(d.ui, s.ui || {}),
+        keys: Object.assign(d.keys, s.keys || {})
+      });
     }
   } catch (e) { console.warn('load failed', e); }
   return defaultState();
@@ -462,10 +528,30 @@ function textHasTerm(normTxt, term) {
   return re.test(normTxt);
 }
 
+// Identify the "requirements / must have / qualifications" portion of a posting,
+// so keywords listed there can be weighted and flagged as required.
+function requiredSectionText(jd) {
+  const REQ_HEAD = /^(minimum |basic )?(requirements?|qualifications?|must[- ]haves?|what (you|you'll|you’ll) (need|bring)|who you are|skills (and|&) experience|what we('|’)re looking for)\b/i;
+  const OTHER_HEAD = /^(responsibilities|duties|what (you|you'll|you’ll) (do|be doing)|about (us|the role|the company)|benefits|perks|compensation|preferred|nice to have|bonus|why (join|work)|our (team|mission)|schedule|education)\b/i;
+  const lines = String(jd || '').split('\n');
+  let inReq = false;
+  const out = [];
+  for (const raw of lines) {
+    const line = raw.trim().replace(/^[-•*•]+\s*/, '');
+    if (line.length && line.length < 70) {
+      if (REQ_HEAD.test(line)) { inReq = true; continue; }
+      if (OTHER_HEAD.test(line)) { inReq = false; continue; }
+    }
+    if (inReq && line) out.push(line);
+  }
+  return out.join('\n');
+}
+
 // Extract ranked keywords from a job description.
 function extractKeywords(jd) {
   const norm = normText(jd);
   if (norm.trim().length < 30) return [];
+  const reqNorm = normText(requiredSectionText(jd));
   const found = new Map(); // term -> weight
 
   // 1) Dictionary phrase matching (highest signal)
@@ -495,9 +581,12 @@ function extractKeywords(jd) {
   for (const [w, f] of uni) if (f >= 3 && w.length > 3 && !covered(w)) found.set(w, (found.get(w) || 0) + f * 0.9);
 
   return [...found.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 28)
-    .map(([term, weight]) => ({ term, weight: Math.round(weight * 10) / 10 }));
+    .map(([term, weight]) => {
+      const req = reqNorm.trim().length > 20 && textHasTerm(reqNorm, term);
+      return { term, weight: Math.round(weight * (req ? 1.6 : 1) * 10) / 10, req };
+    })
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 28);
 }
 
 // Build the full searchable text of a resume version.
@@ -507,6 +596,75 @@ function resumeFullText(version) {
   for (const e of r.experience) parts.push(e.title, e.company, e.bullets.join(' '));
   for (const e of r.education) parts.push(e.degree, e.school);
   return normText(parts.join(' '));
+}
+
+/* ================================================================
+   GRADING ENGINE — multi-factor A–F grade for a resume vs. a posting
+================================================================ */
+function letterFor(pct) {
+  return pct >= 88 ? 'A' : pct >= 80 ? 'A−' : pct >= 72 ? 'B+' : pct >= 64 ? 'B' : pct >= 55 ? 'C' : pct >= 45 ? 'D' : 'F';
+}
+
+function computeGrade(version) {
+  const job = version === 'master' ? null : state.jobs.find(j => j.id === version);
+  const r = buildResumeData(version);
+  const parts = [];
+
+  // 1. Keyword match vs the posting (the big one — required terms already weigh more)
+  let kwRes = null;
+  if (job?.analysis?.keywords?.length) {
+    kwRes = scoreResume(version, job.analysis.keywords);
+    const missReq = kwRes.missing.filter(k => k.req).length;
+    parts.push({ name: 'Keyword match', pct: kwRes.score, w: 55,
+      note: missReq ? `${missReq} REQUIRED term${missReq > 1 ? 's' : ''} still missing` : `${kwRes.found.length}/${job.analysis.keywords.length} posting terms covered` });
+  }
+
+  // 2. Title alignment — does the resume speak the job title's language?
+  if (job?.title) {
+    const tw = normText(job.title).trim().split(' ').filter(w => w.length > 2 && !STOPWORDS.has(w));
+    if (tw.length) {
+      const hay = normText(r.summary + ' ' + r.experience.map(e => e.title).join(' '));
+      const pct = Math.round(tw.filter(w => textHasTerm(hay, w)).length / tw.length * 100);
+      parts.push({ name: 'Title alignment', pct, w: 12,
+        note: pct < 100 ? 'Work the exact job title into your summary — recruiters search titles' : 'Job title appears in your resume' });
+    }
+  }
+
+  // 3. Skills-section coverage — recruiters' keyword searches hit the skills list hardest
+  if (job?.analysis?.keywords?.length) {
+    const top = job.analysis.keywords.slice(0, 10);
+    const skillsTxt = normText(r.skills.join(' '));
+    const pct = Math.round(top.filter(k => textHasTerm(skillsTxt, k.term)).length / top.length * 100);
+    parts.push({ name: 'Skills list coverage', pct, w: 11, note: pct < 60 ? 'Add top posting terms to your Skills section specifically' : '' });
+  }
+
+  // 4. Quantified accomplishments
+  const bullets = r.experience.flatMap(e => e.bullets).map(b => b.trim()).filter(Boolean);
+  if (bullets.length) {
+    const q = bullets.filter(b => /\d/.test(b)).length / bullets.length;
+    parts.push({ name: 'Quantified bullets', pct: Math.min(100, Math.round(q / 0.4 * 100)), w: 11,
+      note: q < 0.4 ? 'Add numbers: volume/day, team size, %, $ — aim for 40%+ of bullets' : '' });
+  }
+
+  // 5. ATS / quality audit
+  const checks = atsAudit(version);
+  const fails = checks.filter(c => c.level === 'fail').length, warns = checks.filter(c => c.level === 'warn').length;
+  parts.push({ name: 'ATS audit', pct: Math.max(0, 100 - fails * 30 - warns * 8), w: 11,
+    note: fails + warns ? `${fails} problem${fails === 1 ? '' : 's'}, ${warns} warning${warns === 1 ? '' : 's'} — see Preview tab` : 'Clean' });
+
+  const wSum = parts.reduce((s, p) => s + p.w, 0);
+  const pct = Math.round(parts.reduce((s, p) => s + p.pct * p.w, 0) / (wSum || 1));
+  return { pct, letter: letterFor(pct), parts, kwRes };
+}
+
+function gradeBarsHTML(g) {
+  return `<div class="gbars">` + g.parts.map(p => `
+    <div class="gbar">
+      <span class="gname">${esc(p.name)}</span>
+      <div class="gtrack"><div class="gfill" style="width:${p.pct}%; background:${ringColor(p.pct)}"></div></div>
+      <span class="gpct">${p.pct}%</span>
+      ${p.note ? `<span class="gnote">${esc(p.note)}</span>` : ''}
+    </div>`).join('') + `</div>`;
 }
 
 function scoreResume(version, keywords) {
@@ -655,14 +813,14 @@ function renderJobList() {
     return;
   }
   el.innerHTML = state.jobs.map(j => {
-    const score = j.analysis ? scoreResume(j.id, j.analysis.keywords) : null;
+    const g = j.analysis ? computeGrade(j.id) : null;
     return `
     <div class="job-list-item ${state.ui.selectedJob === j.id ? 'selected' : ''}" data-action="select-job" data-id="${j.id}">
       <div class="jt">${esc(j.title) || 'Untitled role'}</div>
       <div class="jc">${esc(j.company) || '—'}</div>
       <div class="meta">
         <span class="status-badge status-${j.status}">${j.status}</span>
-        ${score ? `<span class="mini-score">${score.score}% match</span>` : ''}
+        ${g ? `<span class="mini-score" style="color:${ringColor(g.pct)}">${g.letter} · ${g.pct}%</span>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -685,26 +843,40 @@ function scoreRingHTML(score) {
 
 function analysisHTML(job) {
   if (!job.analysis) return '';
-  const res = scoreResume(job.id, job.analysis.keywords);
+  const g = computeGrade(job.id);
+  const res = g.kwRes;
   if (!res) return '';
-  const verdict = res.score >= 75
+  const kwChip = (k, cls, extra = '') =>
+    `<span class="chip ${cls}" ${extra} title="${k.req ? 'Listed under the posting\'s requirements' : ''}">${cls === 'missing' ? '+ ' : ''}${k.req ? '<span class="reqmark">★</span> ' : ''}${esc(k.term)}</span>`;
+  const verdict = g.pct >= 80
     ? '<strong>Strong match.</strong> This resume speaks the posting’s language — good to export.'
-    : res.score >= 50
-      ? '<strong>Getting there.</strong> Click the red keywords below that honestly apply to add them, and work others into your bullets.'
-      : '<strong>Needs tailoring.</strong> A recruiter searching these terms won’t surface this resume yet. Add every missing keyword that truthfully applies.';
+    : g.pct >= 55
+      ? '<strong>Getting there.</strong> Fix the lowest bars below — start with any ★ required keywords still missing.'
+      : '<strong>Needs tailoring.</strong> A recruiter searching these terms won’t surface this resume yet.';
   return `
   <div class="card">
-    <h3>Match score against this posting</h3>
-    <div class="score-row">${scoreRingHTML(res.score)}<div class="score-desc">${verdict}<br><span class="hint">Score = how much of the posting's weighted keyword list your tailored resume covers.</span></div></div>
+    <h3>Grade against this posting</h3>
+    <div class="score-row">
+      <div class="score-ring">
+        <svg width="92" height="92" viewBox="0 0 92 92">
+          <circle cx="46" cy="46" r="40" fill="none" stroke="#eef0f3" stroke-width="9"/>
+          <circle cx="46" cy="46" r="40" fill="none" stroke="${ringColor(g.pct)}" stroke-width="9" stroke-linecap="round"
+            stroke-dasharray="${2*Math.PI*40}" stroke-dashoffset="${2*Math.PI*40*(1-g.pct/100)}"/>
+        </svg>
+        <div class="val" style="color:${ringColor(g.pct)}">${g.letter}</div>
+      </div>
+      <div class="score-desc"><strong style="font-size:16px;">${g.pct}%</strong> overall<br>${verdict}</div>
+    </div>
+    ${gradeBarsHTML(g)}
     <div class="kw-cols">
       <div class="kw-col">
         <h4 class="ok">✓ In your resume (${res.found.length})</h4>
-        <div class="chips">${res.found.map(k => `<span class="chip found">${esc(k.term)}</span>`).join('') || '<span class="hint">None yet</span>'}</div>
+        <div class="chips">${res.found.map(k => kwChip(k, 'found')).join('') || '<span class="hint">None yet</span>'}</div>
       </div>
       <div class="kw-col">
         <h4 class="miss">✗ Missing — click to add to Skills (${res.missing.length})</h4>
-        <div class="chips">${res.missing.map(k => `<span class="chip missing" data-action="add-missing" data-job="${job.id}" data-term="${esc(k.term)}" title="Add to this job's skills">+ ${esc(k.term)}</span>`).join('') || '<span class="hint">Nothing missing 🎉</span>'}</div>
-        <p class="hint">Only add skills she genuinely has — lying gets caught in interviews. For skills shown in her work, weave the exact phrase into a bullet instead.</p>
+        <div class="chips">${res.missing.map(k => kwChip(k, 'missing', `data-action="add-missing" data-job="${job.id}" data-term="${esc(k.term)}"`)).join('') || '<span class="hint">Nothing missing 🎉</span>'}</div>
+        <p class="hint">★ = listed under the posting's requirements — these matter most. Only add skills she genuinely has; for skills shown in her work, weave the exact phrase into a bullet instead.</p>
       </div>
     </div>
   </div>`;
@@ -724,6 +896,7 @@ function renderJobDetail() {
       <div class="toolbar" style="margin-bottom:12px;">
         <h3 style="margin:0;">Application details</h3>
         <span class="spacer"></span>
+        ${job.url ? `<a class="btn small" href="${esc(job.url)}" target="_blank" rel="noopener">Open posting ↗</a>` : ''}
         <button class="btn small ghost danger" data-action="del-job" data-id="${job.id}">Delete application</button>
       </div>
       <div class="grid3">
@@ -775,6 +948,16 @@ function renderJobDetail() {
         <button class="btn small" data-action="copy-cover" data-id="${job.id}">Copy</button>
         <button class="btn small" data-action="download-cover" data-id="${job.id}">Download Word (.doc)</button>
       </div>
+    </div>
+    <div class="card">
+      <h3>Apply Kit — a real application in ~2 minutes</h3>
+      <div class="toolbar" style="margin-bottom:0;">
+        ${job.url ? `<a class="btn primary" href="${esc(job.url)}" target="_blank" rel="noopener">1 · Open posting ↗</a>` : '<span class="hint">No posting link saved — paste the job URL into Notes, or add jobs via Find Jobs / the browser button to capture it automatically.</span>'}
+        <button class="btn" data-action="copy-resume-text" data-id="${job.id}">2 · Copy tailored resume</button>
+        <button class="btn" data-action="copy-cover" data-id="${job.id}">3 · Copy cover letter</button>
+        <button class="btn" data-action="goto-preview" data-id="${job.id}">or download PDF/.doc →</button>
+      </div>
+      <p class="hint" style="margin-top:8px;">Paste into the application form's fields, or attach the exported PDF/.doc. You review and hit submit — no bot, no banned accounts, and every application is genuinely tailored.</p>
     </div>
     ${prepHTML(job)}`;
 }
@@ -1038,11 +1221,15 @@ function renderPreview() {
   const scoreCard = document.getElementById('preview-score-card');
   if (v !== 'master') {
     const job = state.jobs.find(j => j.id === v);
-    const res = job?.analysis ? scoreResume(v, job.analysis.keywords) : null;
     scoreCard.style.display = '';
-    scoreCard.innerHTML = res
-      ? `<h3>Match score</h3><div class="score-row">${scoreRingHTML(res.score)}<div class="score-desc"><strong>${esc(job.title||'')} @ ${esc(job.company||'')}</strong><br>${res.found.length} of ${res.found.length + res.missing.length} posting keywords covered.</div></div>`
-      : `<h3>Match score</h3><p class="hint">Analyze the posting on the Jobs tab to see a score here.</p>`;
+    if (job?.analysis) {
+      const g = computeGrade(v);
+      scoreCard.innerHTML = `<h3>Grade</h3>
+        <div class="score-row">${scoreRingHTML(g.pct)}<div class="score-desc"><strong>${g.letter} — ${esc(job.title||'')} @ ${esc(job.company||'')}</strong><br>${g.kwRes ? `${g.kwRes.found.length} of ${g.kwRes.found.length + g.kwRes.missing.length} posting keywords covered.` : ''}</div></div>
+        ${gradeBarsHTML(g)}`;
+    } else {
+      scoreCard.innerHTML = `<h3>Grade</h3><p class="hint">Analyze the posting on the Jobs tab to see a grade here.</p>`;
+    }
   } else scoreCard.style.display = 'none';
 
   // ATS checks
@@ -1086,12 +1273,154 @@ function exportDoc(version) {
 }
 
 /* ================================================================
+   FIND JOBS — multi-board search, bookmarklet, clipped postings
+================================================================ */
+const IS_SERVED = location.protocol === 'http:' || location.protocol === 'https:';
+
+const SOURCES = [
+  { id: 'demo',      name: 'Demo (sample data)',                          needs: [] },
+  { id: 'adzuna',    name: 'Adzuna — aggregates Indeed, Monster & more',  needs: ['adzunaId', 'adzunaKey'] },
+  { id: 'jooble',    name: 'Jooble — aggregator',                         needs: ['joobleKey'] },
+  { id: 'usajobs',   name: 'USAJobs — US government',                     needs: ['usajobsEmail', 'usajobsKey'] },
+  { id: 'remotive',  name: 'Remotive — remote jobs',                      needs: [] },
+  { id: 'arbeitnow', name: 'Arbeitnow',                                   needs: [] },
+  { id: 'remoteok',  name: 'RemoteOK — remote jobs',                      needs: [] }
+];
+
+let searchResults = [];
+
+function renderSourceChecks() {
+  const el = document.getElementById('source-checks');
+  el.innerHTML = SOURCES.map(s => {
+    const ready = s.needs.every(k => (state.keys[k] || '').trim());
+    const checked = state.ui.sources.includes(s.id);
+    return `<label style="display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:${ready ? 'var(--text)' : 'var(--muted)'}; cursor:${ready ? 'pointer' : 'not-allowed'};">
+      <input type="checkbox" data-source="${s.id}" ${checked && ready ? 'checked' : ''} ${ready ? '' : 'disabled'}>
+      ${esc(s.name)}${ready ? '' : ' <span class="hint">(needs key)</span>'}
+    </label>`;
+  }).join('');
+}
+
+function renderSearch() {
+  document.getElementById('search-offline').style.display = IS_SERVED ? 'none' : '';
+  document.getElementById('search-q').value = state.ui.searchQ || '';
+  document.getElementById('search-loc').value = state.ui.searchLoc || '';
+  document.querySelectorAll('[data-keyfield]').forEach(inp => { inp.value = state.keys[inp.dataset.keyfield] || ''; });
+  renderSourceChecks();
+  renderBookmarklet();
+  renderSearchResults();
+}
+
+function renderBookmarklet() {
+  const zone = document.getElementById('bookmarklet-zone');
+  if (!IS_SERVED) {
+    zone.innerHTML = '<p style="margin:0;">Run the app via <code>Start ResumeForge.command</code> to enable the browser button.</p>';
+    return;
+  }
+  const src = `(function(){var s=window.getSelection().toString();var el=document.querySelector('#jobDescriptionText,.jobs-description__content,.description__text,.jobsearch-JobComponent-description,[class*="jobDescription"]');var t=(s&&s.length>200)?s:(el?el.innerText:document.body.innerText);t=t.slice(0,30000);fetch('${location.origin}/api/clip',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({title:document.title,url:location.href,text:t})}).then(function(){alert('Sent to ResumeForge \\u2713')}).catch(function(){alert('ResumeForge is not running. Start it, then try again.')})})()`;
+  zone.innerHTML = `
+    <p style="margin-top:0;"><strong>One-time setup:</strong> drag this button to your browser's bookmarks bar:</p>
+    <p><a id="bm-link" class="btn primary" style="text-decoration:none;">📋 Grade in ResumeForge</a></p>
+    <p style="margin-bottom:0;">Then, on any job posting — Indeed, LinkedIn, a company site, anywhere — click it. The posting lands in your Jobs tab, already analyzed and graded. (If a site blocks it, select the job description text first, then click the button. Works best in Chrome.)</p>`;
+  document.getElementById('bm-link').href = 'javascript:' + encodeURIComponent(src);
+}
+
+function quickGrade(description) {
+  const kws = extractKeywords(description);
+  if (!kws.length) return null;
+  const res = scoreResume('master', kws);
+  return res ? res.score : null;
+}
+
+async function runSearch() {
+  if (!IS_SERVED) { toast('Job search needs the app server — see the yellow note above'); return; }
+  const q = state.ui.searchQ || '', loc = state.ui.searchLoc || '';
+  const picked = SOURCES.filter(s => state.ui.sources.includes(s.id) && s.needs.every(k => (state.keys[k] || '').trim()));
+  if (!picked.length) { toast('Check at least one source first'); return; }
+  const resultsEl = document.getElementById('search-results');
+  resultsEl.innerHTML = '<div class="card empty-state">Searching ' + picked.map(s => s.id).join(', ') + '…</div>';
+  const errors = [];
+  const settled = await Promise.all(picked.map(async s => {
+    try {
+      const params = new URLSearchParams({ src: s.id, q, loc });
+      for (const k of s.needs) params.set(k, state.keys[k]);
+      const r = await fetch('/api/search?' + params);
+      const d = await r.json();
+      if (d.error) errors.push(`${s.name}: ${d.error}`);
+      return d.results || [];
+    } catch (e) { errors.push(`${s.name}: ${e.message}`); return []; }
+  }));
+  searchResults = settled.flat().map(r => ({ ...r, match: quickGrade(r.description) }));
+  searchResults.sort((a, b) => (b.match ?? -1) - (a.match ?? -1));
+  renderSearchResults(errors);
+}
+
+function renderSearchResults(errors = []) {
+  const el = document.getElementById('search-results');
+  if (!el) return;
+  const errHtml = errors.length ? `<div class="card" style="border-color:var(--amber); background:var(--amber-soft); font-size:13px;">${errors.map(esc).join('<br>')}</div>` : '';
+  if (!searchResults.length) { el.innerHTML = errHtml; return; }
+  el.innerHTML = errHtml + `<p class="sub" style="margin:4px 0 10px;">${searchResults.length} jobs, sorted by how well your <strong>master resume</strong> already matches. Add one to tailor it and raise the grade.</p>` +
+    searchResults.map((r, i) => `
+    <div class="item-card" style="background:var(--surface);">
+      <div class="item-head">
+        <span class="title">${esc(r.title)}</span>
+        ${r.match != null ? `<span class="mini-score" style="color:${ringColor(r.match)}; font-size:14px;">${letterFor(r.match)} · ${r.match}%</span>` : ''}
+      </div>
+      <div class="jc" style="margin:-6px 0 6px;">${esc(r.company)}${r.location ? ' — ' + esc(r.location) : ''} · via ${esc(r.source)}</div>
+      <p style="font-size:13px; color:var(--muted); margin:0 0 10px;">${esc((r.description || '').slice(0, 240))}…</p>
+      <div class="toolbar" style="margin:0;">
+        <button class="btn small primary" data-action="add-search-job" data-i="${i}">Add &amp; tailor →</button>
+        ${r.url ? `<a class="btn small" href="${esc(r.url)}" target="_blank" rel="noopener">Open posting ↗</a>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+function createJobFrom({ title, company, jd, url }) {
+  const job = {
+    id: uid(), title: title || '', company: company || '', jd: jd || '', url: url || '',
+    status: 'saved', dateApplied: '', notes: '', coverLetter: '',
+    createdAt: new Date().toISOString(), tailored: makeTailored(), analysis: null
+  };
+  if ((jd || '').trim().length >= 60) job.analysis = { keywords: extractKeywords(jd), at: new Date().toISOString() };
+  state.jobs.unshift(job);
+  state.ui.selectedJob = job.id;
+  save();
+  return job;
+}
+
+function addJobFromClip(c) {
+  // Page titles look like "Job Title - Company - Indeed.com" — take the useful bits
+  const parts = String(c.title || '').split(/\s+[-|–]\s+/);
+  createJobFrom({
+    title: parts[0] || 'Clipped job',
+    company: parts.length > 2 ? parts[1] : '',
+    jd: c.text, url: c.url
+  });
+}
+
+if (IS_SERVED) {
+  setInterval(async () => {
+    try {
+      const r = await fetch('/api/clips');
+      const d = await r.json();
+      if (d.clips?.length) {
+        for (const c of d.clips) addJobFromClip(c);
+        toast(`📋 ${d.clips.length} posting${d.clips.length > 1 ? 's' : ''} received from your browser — see Jobs & Tailoring`);
+        if (document.getElementById('panel-jobs').classList.contains('active')) renderJobs();
+      }
+    } catch (e) { /* server hiccup — try again next tick */ }
+  }, 4000);
+}
+
+/* ================================================================
    EVENT WIRING
 ================================================================ */
 function switchTab(tab) {
   document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
   if (tab === 'profile') renderProfile();
+  if (tab === 'search') renderSearch();
   if (tab === 'jobs') renderJobs();
   if (tab === 'preview') renderPreview();
 }
@@ -1129,6 +1458,11 @@ document.addEventListener('input', e => {
     const job = state.jobs.find(j => j.id === t.dataset.jobbul);
     const te = job?.tailored.experience.find(x => x.expId === t.dataset.exp);
     if (te) te.bullets = t.value.split('\n');
+  } else if (t.dataset.keyfield) {
+    state.keys[t.dataset.keyfield] = t.value.trim();
+    renderSourceChecks();
+  } else if (t.dataset.uifield) {
+    state.ui[t.dataset.uifield] = t.value;
   } else return;
   save();
 });
@@ -1140,6 +1474,12 @@ document.addEventListener('change', e => {
     const job = state.jobs.find(j => j.id === t.dataset.jobinc);
     const te = job?.tailored.experience.find(x => x.expId === t.dataset.exp);
     if (te) { te.include = t.checked; save(); renderJobDetail(); }
+  } else if (t.dataset.source) {
+    const id = t.dataset.source;
+    state.ui.sources = t.checked
+      ? [...new Set([...state.ui.sources, id])]
+      : state.ui.sources.filter(s => s !== id);
+    save();
   }
 });
 
@@ -1242,6 +1582,19 @@ document.addEventListener('click', e => {
       save(); renderJobDetail();
       toast(`Added "${term}" to this job's skills`);
     }
+  }
+  else if (a === 'run-search') runSearch();
+  else if (a === 'add-search-job') {
+    const r = searchResults[Number(el.dataset.i)];
+    if (!r) return;
+    createJobFrom({ title: r.title, company: r.company, jd: r.description, url: r.url });
+    switchTab('jobs');
+    toast('Added — tailor it below to raise the grade');
+  }
+  else if (a === 'copy-resume-text') {
+    navigator.clipboard.writeText(resumePlainText(el.dataset.id))
+      .then(() => toast('Tailored resume copied — paste it into the application'))
+      .catch(() => toast('⚠ Copy failed — use the Preview tab downloads instead'));
   }
   else if (a === 'gen-cover') {
     const job = state.jobs.find(j => j.id === el.dataset.id);
