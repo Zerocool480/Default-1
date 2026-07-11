@@ -482,6 +482,22 @@ const SKILL_DICT = [
   'digital marketing','social media marketing','social media management','content creation','content marketing','copywriting','seo',
   'sem','email marketing','google analytics','google ads','facebook ads','brand management','market research','campaign management',
   'influencer marketing','canva','adobe creative suite','photoshop','illustrator','indesign','video editing','graphic design',
+  // Content design / UX / knowledge management / support operations
+  'content design','content designer','content strategy','content management','content governance','content audit','content operations',
+  'ux writing','ux writer','microcopy','ux design','user experience','user-centered','conversation design','conversational design',
+  'chatbot','chat bot','voice assistant','voice bot','ivr','nlu','natural language understanding','prompt writing',
+  'knowledge management','knowledge base','knowledge architecture','help center','support center','help content','self-service',
+  'deflection','contact rate','information architecture','taxonomy','metadata','tagging','content migration',
+  'style guide','voice and tone','tone of voice','brand voice','plain language','terminology management','editorial guidelines',
+  'localization','translation','multilingual','content localization','globalization',
+  'technical writing','technical documentation','documentation','process documentation','job aids','sops','runbooks',
+  'user research','usability testing','experimentation','content experiments','content testing','multivariate testing',
+  'design systems','figma','sketch','adobe xd','confluence','notion','airtable','freshdesk','khoros','intercom',
+  'contentful','wordpress','drupal','zendesk guide','salesforce knowledge','sharepoint','markdown',
+  'accessibility','wcag','inclusive language','readability','seo writing','editorial calendar','copy editing',
+  'csat','nps','first contact resolution','average handle time','quality scores','escalations','escalation management',
+  'macros','agent enablement','agent training','support operations','customer experience','customer journey','journey mapping',
+  'transactional emails','email templates','saas','omnichannel','live chat','content lifecycle','version control','change management',
   // Finance / accounting / HR
   'accounts payable','accounts receivable','bookkeeping','quickbooks','payroll','payroll processing','general ledger','reconciliation',
   'bank reconciliation','financial reporting','budgeting','forecasting','auditing','tax preparation','invoicing','billing','collections',
@@ -876,7 +892,7 @@ function analysisHTML(job) {
       <div class="kw-col">
         <h4 class="miss">✗ Missing — click to add to Skills (${res.missing.length})</h4>
         <div class="chips">${res.missing.map(k => kwChip(k, 'missing', `data-action="add-missing" data-job="${job.id}" data-term="${esc(k.term)}"`)).join('') || '<span class="hint">Nothing missing 🎉</span>'}</div>
-        <p class="hint">★ = listed under the posting's requirements — these matter most. Only add skills she genuinely has; for skills shown in her work, weave the exact phrase into a bullet instead.</p>
+        <p class="hint">★ = listed under the posting's requirements — these matter most. Only add skills you genuinely have; for skills your work already shows, weave the exact phrase into a bullet instead.</p>
       </div>
     </div>
   </div>`;
