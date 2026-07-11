@@ -33,14 +33,8 @@ const MIME = {
   '.md': 'text/plain; charset=utf-8'
 };
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type'
-};
-
 function send(res, code, body, type = 'application/json') {
-  res.writeHead(code, Object.assign({ 'Content-Type': type }, CORS));
+  res.writeHead(code, { 'Content-Type': type });
   res.end(typeof body === 'string' ? body : JSON.stringify(body));
 }
 
@@ -56,21 +50,22 @@ async function fetchJson(url, opts = {}) {
   return r.json();
 }
 
+const daysAgo = d => new Date(Date.now() - d * 86400000).toISOString();
 const DEMO_JOBS = q => [
   {
     title: `${q || 'Office'} Coordinator`, company: 'Sample Health Group', location: 'Anywhere, USA',
-    url: 'https://example.com/demo-1', source: 'Demo',
-    description: `We are seeking a ${q || 'office'} coordinator. Responsibilities: patient scheduling, customer service, data entry, insurance verification, multi-line phone. Requirements: 2+ years experience, Microsoft Office, electronic health records, HIPAA, strong communication and time management skills.`
+    url: 'https://example.com/demo-1', source: 'Demo', posted: daysAgo(1),
+    description: `We are seeking a ${q || 'office'} coordinator to join our busy practice. Responsibilities: manage patient scheduling and patient intake for multiple providers, deliver excellent customer service, perform accurate data entry, handle insurance verification and prior authorization requests, and answer a multi-line phone system. Requirements: 2+ years experience in a medical or office setting, proficiency with Microsoft Office and electronic health records, knowledge of HIPAA compliance, strong communication and time management skills. Bilingual Spanish a plus.`
   },
   {
     title: `Senior ${q || 'Office'} Specialist`, company: 'Demo Logistics Inc', location: 'Remote',
-    url: 'https://example.com/demo-2', source: 'Demo',
-    description: `Requirements: inventory management, order fulfillment, Microsoft Excel, data entry, attention to detail, fast-paced environment. Responsibilities include shipping, receiving, vendor management, process improvement and reporting.`
+    url: 'https://example.com/demo-2', source: 'Demo', posted: daysAgo(6),
+    description: `Join our operations team. Responsibilities: oversee shipping and receiving, coordinate order fulfillment across two warehouses, manage vendor relationships, drive process improvement initiatives, and produce weekly reporting for leadership. Requirements: 3+ years experience with inventory management, advanced Microsoft Excel (pivot tables, vlookup), accurate data entry, strong attention to detail, and comfort in a fast-paced environment. Forklift certification a plus.`
   },
   {
     title: `${q || 'Customer'} Support Representative`, company: 'Example Retail Co', location: 'Anywhere, USA',
-    url: 'https://example.com/demo-3', source: 'Demo',
-    description: `Must have: customer service, conflict resolution, POS systems, cash handling, upselling. Preferred: bilingual Spanish, scheduling, inventory control, training new team members.`
+    url: 'https://example.com/demo-3', source: 'Demo', posted: daysAgo(21),
+    description: `Deliver outstanding customer service across phone, chat, and email while resolving billing questions and order issues. Responsibilities: handle escalations with professional conflict resolution, operate POS systems with accurate cash handling, identify upselling opportunities, and maintain customer satisfaction benchmarks. Requirements: 1+ years customer service experience, strong communication skills, scheduling flexibility including weekends. Preferred: bilingual Spanish, inventory control experience, and training new team members.`
   }
 ];
 
@@ -83,7 +78,9 @@ async function searchSource(p) {
       return DEMO_JOBS(q);
 
     case 'adzuna': {
-      const id = p.get('adzunaId'), key = p.get('adzunaKey'), country = (p.get('country') || 'us').toLowerCase();
+      const id = p.get('adzunaId'), key = p.get('adzunaKey');
+      const rawCountry = (p.get('country') || 'us').toLowerCase();
+      const country = /^[a-z]{2}$/.test(rawCountry) ? rawCountry : 'us';
       if (!id || !key) throw new Error('Adzuna needs an app id and key');
       const d = await fetchJson(`https://api.adzuna.com/v1/api/jobs/${country}/search/1?app_id=${enc(id)}&app_key=${enc(key)}&results_per_page=20&what=${enc(q)}&where=${enc(loc)}&content-type=application/json`);
       return (d.results || []).map(r => ({
@@ -167,7 +164,7 @@ function readBody(req, limit = 1024 * 1024) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
-  if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
+  if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
 
   if (url.pathname === '/api/clip' && req.method === 'POST') {
     try {
@@ -198,16 +195,16 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  if (url.pathname === '/favicon.ico') { res.writeHead(204, CORS); return res.end(); }
+  if (url.pathname === '/favicon.ico') { res.writeHead(204); return res.end(); }
 
   // Static files
   let file = url.pathname === '/' ? '/index.html' : url.pathname;
   file = path.normalize(file).replace(/^(\.\.[/\\])+/, '');
   const full = path.join(ROOT, file);
-  if (!full.startsWith(ROOT)) return send(res, 403, { error: 'forbidden' });
+  if (full !== ROOT && !full.startsWith(ROOT + path.sep)) return send(res, 403, { error: 'forbidden' });
   fs.readFile(full, (err, data) => {
     if (err) return send(res, 404, 'Not found', 'text/plain');
-    res.writeHead(200, Object.assign({ 'Content-Type': MIME[path.extname(full)] || 'application/octet-stream' }, CORS));
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(full)] || 'application/octet-stream' });
     res.end(data);
   });
 });

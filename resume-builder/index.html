@@ -104,6 +104,7 @@
   .chip.found { background: var(--green-soft); color: var(--green); }
   .chip.missing { background: var(--red-soft); color: var(--red); cursor: pointer; border: 1px dashed rgba(180,35,24,.4); }
   .chip.missing:hover { background: #fbd9d5; }
+  .chip.partial { background: var(--amber-soft); color: var(--amber); }
 
   /* Jobs layout */
   .jobs-layout { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
@@ -166,7 +167,7 @@
   }
 
   /* ===== Resume document styles (screen preview AND print) ===== */
-  .resume-doc { font-family: Calibri, Carlito, "Segoe UI", Arial, sans-serif; color: #111; font-size: 10.6pt; line-height: 1.38; }
+  .resume-doc { font-family: Calibri, Carlito, "Segoe UI", Arial, sans-serif; color: #111; font-size: 10.6pt; line-height: 1.38; font-variant-ligatures: none; }
   .resume-doc .r-name { font-size: 19pt; font-weight: 700; letter-spacing: .3px; margin: 0; }
   .resume-doc .r-contact { font-size: 10pt; margin: 3pt 0 0; color: #222; }
   .resume-doc .r-sec { font-size: 11pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1.2pt solid #333; padding-bottom: 2pt; margin: 13pt 0 6pt; }
@@ -240,6 +241,7 @@
       <summary>How applicant tracking systems (ATS) actually work — worth 2 minutes</summary>
       <div class="card">
         <p><strong>The truth most resume services won't tell you:</strong> the majority of ATS don't auto-reject anyone. They're databases. A recruiter types search terms (usually words straight from their own job posting) and resumes that contain those words rank higher. Resumes that parse badly or lack the words are effectively invisible — not "rejected," just never seen.</p>
+        <p><strong>The honest nuance:</strong> what CAN auto-reject you are knockout screening questions and hard eligibility filters (work authorization, required license or degree, location), and at large employers an AI ranking layer decides whether a human ever looks. That's why the analyzer flags knockout requirements first — eligibility matters as much as keywords.</p>
         <p>So the winning strategy is simple and this tool is built around it:</p>
         <ul>
           <li><strong>Mirror the posting's exact words.</strong> If they say "patient scheduling," write "patient scheduling," not "coordinated appointments." The analyzer finds these words for you.</li>
@@ -358,7 +360,7 @@
   <!-- ============ PREVIEW TAB ============ -->
   <section class="tab-panel" id="panel-preview">
     <h2>Preview &amp; Export</h2>
-    <p class="sub">This is exactly what gets exported: a single-column, standard-heading layout that every ATS can parse cleanly.</p>
+    <p class="sub">A single-column, standard-heading layout designed to parse cleanly. The PDF matches this preview closest; .docx and .txt reflow the same content. For Workday/iCIMS/Taleo uploads, prefer the .docx.</p>
 
     <div class="toolbar">
       <label style="margin:0;">Resume version:</label>
@@ -366,10 +368,11 @@
       <span class="spacer"></span>
       <button class="btn" data-action="copy-text">Copy as plain text</button>
       <button class="btn" data-action="download-txt">Download .txt</button>
-      <button class="btn" data-action="download-doc">Download Word (.doc)</button>
+      <button class="btn primary" data-action="download-doc">Download Word (.docx)</button>
       <button class="btn primary" data-action="print-pdf">Save as PDF</button>
     </div>
-    <p class="hint" id="filename-hint" style="margin-bottom:14px;"></p>
+    <p class="hint" id="filename-hint" style="margin-bottom:4px;"></p>
+    <p class="hint" style="margin-bottom:14px;">PDF check after saving: open it, select-all, copy, and paste into any text box — if the text pastes cleanly, it parses cleanly.</p>
 
     <div class="preview-layout">
       <div class="resume-sheet"><div id="resume-preview" class="resume-doc"></div></div>
@@ -421,22 +424,71 @@ function load() {
       const s = JSON.parse(raw);
       // merge with defaults for forward-compat
       const d = defaultState();
-      return Object.assign(d, s, {
+      return normalizeState(Object.assign(d, s, {
         ui: Object.assign(d.ui, s.ui || {}),
         keys: Object.assign(d.keys, s.keys || {})
-      });
+      }));
     }
-  } catch (e) { console.warn('load failed', e); }
+  } catch (e) {
+    console.warn('load failed', e);
+    // Rescue the unreadable blob instead of silently overwriting it.
+    try { const raw = localStorage.getItem(STORE_KEY); if (raw) localStorage.setItem(STORE_KEY + '_corrupt', raw); } catch (e2) {}
+  }
   return defaultState();
 }
 
 let saveTimer = null;
+function flushNow() {
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    hideStorageBanner();
+  } catch (e) { showStorageBanner(); }
+}
 function save() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
-    catch (e) { toast('⚠ Could not save — storage full?'); }
-  }, 250);
+  saveTimer = setTimeout(flushNow, 250);
+}
+// Never lose the last editing burst: flush synchronously when the tab hides or closes.
+addEventListener('pagehide', flushNow);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushNow(); });
+
+// If another tab (same origin) writes, adopt its state instead of clobbering it later.
+addEventListener('storage', e => {
+  if (e.key === STORE_KEY && e.newValue && !saveTimer) {
+    try {
+      const s = JSON.parse(e.newValue);
+      const d = defaultState();
+      state = normalizeState(Object.assign(d, s, { ui: Object.assign(d.ui, s.ui || {}), keys: Object.assign(d.keys, s.keys || {}) }));
+      const active = document.querySelector('nav.tabs button.active')?.dataset.tab;
+      if (active) switchTab(active);
+    } catch (err) { /* ignore malformed cross-tab writes */ }
+  }
+});
+
+function showStorageBanner() {
+  if (document.getElementById('storage-banner')) return;
+  const b = document.createElement('div');
+  b.id = 'storage-banner';
+  b.style.cssText = 'position:sticky;top:0;z-index:60;background:var(--red-soft);color:var(--red);padding:10px 20px;font-weight:600;font-size:13.5px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;';
+  b.innerHTML = '⚠ Browser storage is full — your latest edits are NOT being saved. <button class="btn small" data-action="export-json">Download backup now</button> <span style="font-weight:400;">Then delete old applications (their pasted postings use the most space) and edit again.</span>';
+  document.body.prepend(b);
+}
+function hideStorageBanner() { document.getElementById('storage-banner')?.remove(); }
+
+// Defensive normalization for data loaded from older app versions or imports.
+function normalizeState(s) {
+  s.jobs = (s.jobs || []).filter(j => j && typeof j === 'object').map(j => Object.assign({
+    id: uid(), title: '', company: '', jd: '', url: '', status: 'saved', dateApplied: '',
+    notes: '', coverLetter: '', createdAt: '', analysis: null
+  }, j, { tailored: Object.assign({ summary: '', skills: [], experience: [] }, j.tailored || {}) }));
+  const p = s.profile;
+  p.contact = Object.assign({ name: '', email: '', phone: '', location: '', linkedin: '', website: '' }, p.contact || {});
+  p.skills = Array.isArray(p.skills) ? p.skills : [];
+  p.experience = Array.isArray(p.experience) ? p.experience : [];
+  p.education = Array.isArray(p.education) ? p.education : [];
+  return s;
 }
 
 function toast(msg) {
@@ -449,13 +501,16 @@ function toast(msg) {
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+// Only http(s) URLs may become links — anything else (javascript:, data:) renders as no link.
+const safeUrl = u => /^https?:\/\//i.test(String(u || '').trim()) ? String(u).trim() : '';
+
 /* ================================================================
    KEYWORD ANALYSIS ENGINE
 ================================================================ */
 
 // Curated multi-word & single-word skills across common fields. Multi-word
 // terms are matched as phrases, which generic frequency analysis would miss.
-const SKILL_DICT = [
+const SKILL_DICT = [...new Set([
   // Office / admin
   'microsoft office','microsoft excel','microsoft word','microsoft outlook','powerpoint','google workspace','google sheets','google docs',
   'data entry','calendar management','scheduling','appointment scheduling','travel arrangements','expense reports','office management',
@@ -523,7 +578,7 @@ const SKILL_DICT = [
   'time management','attention to detail','multitasking','organization','organizational skills','adaptability','critical thinking',
   'decision making','interpersonal skills','work ethic','self-motivated','fast-paced environment','deadline-driven','bilingual','spanish',
   'team leadership','coaching','mentoring','training','supervision','delegation','customer-focused','detail-oriented','prioritization'
-];
+])];
 
 const STOPWORDS = new Set(('a,an,the,and,or,but,if,then,else,for,to,of,in,on,at,by,with,from,as,is,are,was,were,be,been,being,have,has,had,do,does,did,will,would,should,could,can,may,might,must,shall,not,no,yes,this,that,these,those,it,its,we,our,you,your,they,their,them,he,she,his,her,i,me,my,who,whom,which,what,when,where,why,how,all,any,both,each,few,more,most,other,some,such,than,too,very,just,also,about,above,after,again,against,below,between,into,through,during,before,under,over,out,off,up,down,own,same,so,per,via,etc,eg,ie,'
 + 'job,work,role,position,candidate,candidates,applicant,applicants,apply,application,company,team,teams,employee,employees,employer,opportunity,opportunities,description,responsibilities,requirements,qualifications,preferred,required,must,ability,able,skills,skill,experience,experienced,years,year,including,include,includes,included,knowledge,strong,excellent,good,great,plus,bonus,benefits,salary,pay,hour,hourly,week,weekly,day,daily,month,monthly,full,part,time,shift,shifts,schedule,location,remote,hybrid,onsite,equal,diversity,disability,veteran,gender,race,religion,orientation,status,law,federal,state,local,click,link,please,visit,us,new,high,school,degree,bachelor,bachelors,master,masters,associate,associates,ged,perform,performs,performing,duties,duty,assigned,related,within,ensure,ensures,ensuring,provide,provides,providing,maintain,maintains,maintaining,assist,assists,assisting,support,supporting,help,helps,helping,other,others,various,general,using,use,used,uses,well,working,environment,looking,seeking,join,ideal,successful,demonstrated,proven,minimum,least,along,across,every,essential,functions,function,physical,lift,pounds,stand,walk,sit,reach,department,departments,manager,management,type,pm,am').split(','));
@@ -531,17 +586,47 @@ const STOPWORDS = new Set(('a,an,the,and,or,but,if,then,else,for,to,of,in,on,at,
 function normText(s) {
   return ' ' + String(s || '').toLowerCase()
     .replace(/[‘’]/g, "'").replace(/[“”]/g, '"')
+    .replace(/'(ll|re|ve|d|m|t|s)\b/g, '')
     .replace(/[–—]/g, '-')
     .replace(/[^a-z0-9+#./' -]/g, ' ')
     .replace(/\s+/g, ' ') + ' ';
 }
 
-// Does normalized text contain the term (with light plural/suffix tolerance)?
+// Light stemmer applied symmetrically to keyword and resume text, so a plural
+// extracted keyword still matches singular resume wording (and vice versa).
+function stemWord(w) {
+  if (w.length < 4) return w;
+  if (/ies$/.test(w)) return w.slice(0, -3) + 'y';
+  if (/(ches|shes|sses|xes|zes)$/.test(w)) w = w.slice(0, -2);
+  else if (/s$/.test(w) && !/[su]s$/.test(w)) w = w.slice(0, -1);
+  if (/ing$/.test(w) && w.length >= 7) w = w.slice(0, -3);
+  else if (/ed$/.test(w) && w.length >= 6) w = w.slice(0, -2);
+  if (/([b-df-hj-np-tv-z])\1$/.test(w)) w = w.slice(0, -1);
+  if (/e$/.test(w) && w.length >= 5) w = w.slice(0, -1);
+  return w;
+}
+const _stemCache = new Map();
+function stemText(s) {
+  if (_stemCache.has(s)) return _stemCache.get(s);
+  const out = ' ' + s.trim().split(/\s+/).map(stemWord).join(' ') + ' ';
+  if (_stemCache.size > 24) _stemCache.clear();
+  _stemCache.set(s, out);
+  return out;
+}
+const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Does normalized text contain the term? Exact/suffix-tolerant first, then a
+// symmetric stemmed comparison. Terms whose words are all very short (acronyms
+// like "ia") only ever match exactly.
 function textHasTerm(normTxt, term) {
-  const t = term.toLowerCase();
-  const escT = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const re = new RegExp('(^|[^a-z0-9])' + escT + '(s|es|ing|ed)?([^a-z0-9]|$)', 'i');
-  return re.test(normTxt);
+  const t = term.toLowerCase().trim();
+  const re = new RegExp('(^|[^a-z0-9])' + escRe(t) + '(s|es|ing|ed)?([^a-z0-9]|$)', 'i');
+  if (re.test(normTxt)) return true;
+  const words = t.split(/\s+/);
+  if (!words.some(w => w.length >= 4)) return false;
+  const stemmed = words.map(stemWord).join(' ');
+  if (stemmed === t) return false;
+  return new RegExp('(^|[^a-z0-9])' + escRe(stemmed) + '([^a-z0-9]|$)', 'i').test(stemText(normTxt));
 }
 
 // Identify the "requirements / must have / qualifications" portion of a posting,
@@ -549,18 +634,31 @@ function textHasTerm(normTxt, term) {
 function requiredSectionText(jd) {
   const REQ_HEAD = /^(minimum |basic )?(requirements?|qualifications?|must[- ]haves?|what (you|you'll|you’ll) (need|bring)|who you are|skills (and|&) experience|what we('|’)re looking for)\b/i;
   const OTHER_HEAD = /^(responsibilities|duties|what (you|you'll|you’ll) (do|be doing)|about (us|the role|the company)|benefits|perks|compensation|preferred|nice to have|bonus|why (join|work)|our (team|mission)|schedule|education)\b/i;
-  const lines = String(jd || '').split('\n');
+  const src = String(jd || '');
+  const lines = src.split('\n');
+  // A line only counts as a section header if it LOOKS like one — short, few
+  // words, no digits ("Must have 5 years Excel" is content, not a header).
+  const looksLikeHeader = line => line.length < 45 && !/\d/.test(line) && line.replace(/:$/, '').split(/\s+/).length <= 5;
   let inReq = false;
   const out = [];
   for (const raw of lines) {
-    const line = raw.trim().replace(/^[-•*•]+\s*/, '');
-    if (line.length && line.length < 70) {
+    const line = raw.trim().replace(/^[-•*·]+\s*/, '');
+    if (line && looksLikeHeader(line)) {
       if (REQ_HEAD.test(line)) { inReq = true; continue; }
       if (OTHER_HEAD.test(line)) { inReq = false; continue; }
     }
     if (inReq && line) out.push(line);
   }
-  return out.join('\n');
+  if (out.length) return out.join('\n');
+  // Newline-poor postings (clipped innerText often collapses): slice between
+  // an inline "Requirements:" marker and the next section-ish marker.
+  const m = src.match(/(requirements?|qualifications?|must[- ]haves?)\s*:?\s+/i);
+  if (m) {
+    const rest = src.slice(m.index + m[0].length);
+    const stop = rest.search(/\b(responsibilities|benefits|perks|about us|nice to have|preferred|compensation|why join)\b/i);
+    return rest.slice(0, stop > 0 ? stop : 1500);
+  }
+  return '';
 }
 
 // Extract ranked keywords from a job description.
@@ -582,17 +680,33 @@ function extractKeywords(jd) {
     }
   }
 
-  // 2) Generic frequency analysis for domain terms not in the dictionary
-  const words = norm.trim().split(' ').filter(w => w.length > 2 && !STOPWORDS.has(w) && !/^\d+$/.test(w));
+  // 2) Generic frequency analysis for domain terms not in the dictionary.
+  // Tokenize per sentence/clause segment so bigrams are only ever pairs of
+  // words that were truly adjacent in the posting (no phantom phrases).
+  const isStop = w => w.length <= 2 || STOPWORDS.has(w) || /^\d+$/.test(w);
+  const segments = String(jd || '').toLowerCase()
+    .replace(/[‘’]/g, "'").replace(/'(ll|re|ve|d|m|t|s)\b/g, '')
+    .split(/[.!?;:\n•·|()]+/);
   const uni = new Map(), bi = new Map();
-  for (let i = 0; i < words.length; i++) {
-    uni.set(words[i], (uni.get(words[i]) || 0) + 1);
-    if (i < words.length - 1) {
-      const bg = words[i] + ' ' + words[i + 1];
-      bi.set(bg, (bi.get(bg) || 0) + 1);
+  for (const seg of segments) {
+    const ws = seg.replace(/[^a-z0-9+#/ -]/g, ' ').split(/\s+/).filter(Boolean);
+    for (let i = 0; i < ws.length; i++) {
+      if (isStop(ws[i])) continue;
+      uni.set(ws[i], (uni.get(ws[i]) || 0) + 1);
+      if (i + 1 < ws.length && !isStop(ws[i + 1])) {
+        const bg = ws[i] + ' ' + ws[i + 1];
+        bi.set(bg, (bi.get(bg) || 0) + 1);
+      }
     }
   }
-  const covered = t => [...found.keys()].some(k => k.includes(t) || t.includes(k));
+  // Whole-word overlap, so e.g. "sales" doesn't suppress "salesforce".
+  const covered = t => {
+    const tw = t.split(' ');
+    return [...found.keys()].some(k => {
+      const kw = k.split(' ');
+      return tw.every(w => kw.includes(w)) || kw.every(w => tw.includes(w));
+    });
+  };
   for (const [bg, f] of bi) if (f >= 2 && !covered(bg)) found.set(bg, (found.get(bg) || 0) + f * 1.5);
   for (const [w, f] of uni) if (f >= 3 && w.length > 3 && !covered(w)) found.set(w, (found.get(w) || 0) + f * 0.9);
 
@@ -632,12 +746,13 @@ function computeGrade(version) {
     kwRes = scoreResume(version, job.analysis.keywords);
     const missReq = kwRes.missing.filter(k => k.req).length;
     parts.push({ name: 'Keyword match', pct: kwRes.score, w: 55,
-      note: missReq ? `${missReq} REQUIRED term${missReq > 1 ? 's' : ''} still missing` : `${kwRes.found.length}/${job.analysis.keywords.length} posting terms covered` });
+      note: missReq ? `${missReq} REQUIRED term${missReq > 1 ? 's' : ''} still missing` : `${kwRes.found.length + kwRes.partial.length}/${job.analysis.keywords.length} posting terms covered${kwRes.partial.length ? ` — ${kwRes.partial.length} only via synonym; use the exact word for full credit` : ''}` });
   }
 
   // 2. Title alignment — does the resume speak the job title's language?
   if (job?.title) {
-    const tw = normText(job.title).trim().split(' ').filter(w => w.length > 2 && !STOPWORDS.has(w));
+    const TITLE_STOP = new Set(['a', 'an', 'the', 'of', 'and', 'or', 'for', 'to', 'in', 'with', 'at', 'on']);
+    const tw = normText(job.title).trim().split(' ').filter(w => w.length > 1 && !TITLE_STOP.has(w));
     if (tw.length) {
       const hay = normText(r.summary + ' ' + r.experience.map(e => e.title).join(' '));
       const pct = Math.round(tw.filter(w => textHasTerm(hay, w)).length / tw.length * 100);
@@ -683,17 +798,51 @@ function gradeBarsHTML(g) {
     </div>`).join('') + `</div>`;
 }
 
+// Synonym/acronym clusters: a synonym hit earns HALF credit — recruiters'
+// boolean searches often OR these, but exact wording is still safest.
+const SYNONYM_CLUSTERS = [
+  ['content design', 'content designer', 'ux writing', 'ux writer', 'product content'],
+  ['content strategy', 'content strategist'],
+  ['knowledge management', 'km', 'knowledge base', 'knowledge architecture'],
+  ['information architecture', 'ia'],
+  ['content management system', 'content management systems', 'cms'],
+  ['customer service', 'customer support', 'customer care'],
+  ['electronic health records', 'electronic medical records', 'ehr', 'emr'],
+  ['search engine optimization', 'seo'],
+  ['a/b testing', 'ab testing', 'experimentation', 'content experiments', 'multivariate testing'],
+  ['help center', 'support center', 'help content'],
+  ['conversation design', 'conversational design', 'chatbot', 'chat bot', 'voice assistant'],
+  ['quality assurance', 'qa', 'qa testing'],
+  ['first contact resolution', 'fcr'],
+  ['average handle time', 'aht'],
+  ['natural language understanding', 'nlu'],
+  ['user experience', 'ux'],
+  ['accounts payable', 'ap'], ['accounts receivable', 'ar'],
+  ['human resources', 'hr'], ['profit and loss', 'p&l']
+];
+function synonymHit(txt, term) {
+  for (const cluster of SYNONYM_CLUSTERS) {
+    if (!cluster.includes(term)) continue;
+    for (const alt of cluster) if (alt !== term && textHasTerm(txt, alt)) return alt;
+  }
+  return null;
+}
+
 function scoreResume(version, keywords) {
   if (!keywords || !keywords.length) return null;
   const txt = resumeFullText(version);
   let got = 0, total = 0;
-  const foundK = [], missingK = [];
+  const foundK = [], partialK = [], missingK = [];
   for (const k of keywords) {
     total += k.weight;
     if (textHasTerm(txt, k.term)) { got += k.weight; foundK.push(k); }
-    else missingK.push(k);
+    else {
+      const via = synonymHit(txt, k.term);
+      if (via) { got += k.weight * 0.5; partialK.push({ ...k, via }); }
+      else missingK.push(k);
+    }
   }
-  return { score: Math.round((got / total) * 100), found: foundK, missing: missingK };
+  return { score: Math.round((got / total) * 100), found: foundK, partial: partialK, missing: missingK };
 }
 
 /* ================================================================
@@ -720,9 +869,9 @@ function buildResumeData(version) {
     summary: t.summary,
     skills: t.skills.slice(),
     experience: t.experience.filter(te => te.include).map(te => {
-      const master = p.experience.find(e => e.id === te.expId) || {};
-      return { ...master, bullets: te.bullets.slice() };
-    }),
+      const master = p.experience.find(e => e.id === te.expId) || te.snapshot;
+      return master ? { ...master, bullets: te.bullets.slice() } : null;
+    }).filter(Boolean),
     education: p.education.slice(),
     certifications: p.certifications
   };
@@ -744,7 +893,9 @@ function syncTailored(job) {
   for (const e of state.profile.experience) {
     if (!ids.has(e.id)) job.tailored.experience.push({ expId: e.id, include: true, bullets: e.bullets.slice() });
   }
-  job.tailored.experience = job.tailored.experience.filter(t => state.profile.experience.some(e => e.id === t.expId));
+  // Keep orphaned tailored entries (their master role was deleted) as long as
+  // they carry a snapshot of the role details; only legacy dangling refs drop.
+  job.tailored.experience = job.tailored.experience.filter(t => t.snapshot || state.profile.experience.some(e => e.id === t.expId));
 }
 
 /* ================================================================
@@ -829,7 +980,7 @@ function renderJobList() {
     return;
   }
   el.innerHTML = state.jobs.map(j => {
-    const g = j.analysis ? computeGrade(j.id) : null;
+    const g = j.analysis?.keywords?.length ? computeGrade(j.id) : null;
     return `
     <div class="job-list-item ${state.ui.selectedJob === j.id ? 'selected' : ''}" data-action="select-job" data-id="${j.id}">
       <div class="jt">${esc(j.title) || 'Untitled role'}</div>
@@ -857,6 +1008,37 @@ function scoreRingHTML(score) {
   </div>`;
 }
 
+/* Knockout requirements — the REAL auto-reject vectors (screening questions,
+   hard eligibility filters). No keyword tailoring overcomes these. */
+const KNOCKOUT_PATTERNS = [
+  { label: 'Work authorization / visa', re: /(work authorization|authorized to work|eligible to work|right to work|visa sponsorship|no sponsorship|sponsorship is not available|us citizen(ship)?|green card|permanent resident)/i },
+  { label: 'Security clearance', re: /(security clearance|ts\/sci|top secret|secret clearance)/i },
+  { label: 'Location / onsite', re: /(on-?site required|in[- ]office \d|days? (per|a) week in|must (be located|reside|live)|relocat(e|ion)|local candidates only|commutable)/i },
+  { label: 'Minimum years of experience', re: /\b\d+\+?\s*(?:years?|yrs?)[^.\n]{0,50}(?:experience|exp)\b/i },
+  { label: 'Degree requirement', re: /(bachelor'?s?|master'?s?|ph\.?d|b\.s\.|m\.s\.)[^.\n]{0,40}(required|must)|(required|must)[^.\n]{0,40}(bachelor|master|degree)/i },
+  { label: 'License / certification required', re: /(license|licensure|certification|certified)[^.\n]{0,30}(required|must)|(required|must)[^.\n]{0,40}(license|certification)|driver'?s license|\bcdl\b/i },
+  { label: 'Background / drug screening', re: /(background check|drug (screen|test))/i },
+  { label: 'Schedule / shift / travel', re: /(night shift|weekends? required|overtime required|travel (up to|required|\d+%)|rotating shifts)/i }
+];
+function detectKnockouts(jd) {
+  const out = [];
+  for (const k of KNOCKOUT_PATTERNS) {
+    const m = String(jd || '').match(k.re);
+    if (m) out.push({ label: k.label, excerpt: m[0].trim().slice(0, 110) });
+  }
+  return out;
+}
+function knockoutHTML(job) {
+  const ks = detectKnockouts(job.jd);
+  if (!ks.length) return '';
+  return `
+  <div class="card" style="border-color:var(--amber); background:var(--amber-soft);" id="knockout-panel">
+    <h3 style="color:var(--amber);">⚠ Possible knockout requirements — check these before anything else</h3>
+    <p class="hint" style="margin:0 0 8px;">Screening questions and hard eligibility filters are what actually auto-reject applications. No keyword tailoring overcomes them — make sure each is true for you before investing time here.</p>
+    ${ks.map(k => `<div class="check-item"><div class="check-icon" style="background:#fff;color:var(--amber);">!</div><div><div class="ct">${esc(k.label)}</div><div class="cd">“…${esc(k.excerpt)}…”</div></div></div>`).join('')}
+  </div>`;
+}
+
 function analysisHTML(job) {
   if (!job.analysis) return '';
   const g = computeGrade(job.id);
@@ -869,7 +1051,7 @@ function analysisHTML(job) {
     : g.pct >= 55
       ? '<strong>Getting there.</strong> Fix the lowest bars below — start with any ★ required keywords still missing.'
       : '<strong>Needs tailoring.</strong> A recruiter searching these terms won’t surface this resume yet.';
-  return `
+  return knockoutHTML(job) + `
   <div class="card">
     <h3>Grade against this posting</h3>
     <div class="score-row">
@@ -886,8 +1068,8 @@ function analysisHTML(job) {
     ${gradeBarsHTML(g)}
     <div class="kw-cols">
       <div class="kw-col">
-        <h4 class="ok">✓ In your resume (${res.found.length})</h4>
-        <div class="chips">${res.found.map(k => kwChip(k, 'found')).join('') || '<span class="hint">None yet</span>'}</div>
+        <h4 class="ok">✓ In your resume (${res.found.length}${res.partial.length ? ` + ${res.partial.length} partial` : ''})</h4>
+        <div class="chips">${res.found.map(k => kwChip(k, 'found')).join('')}${res.partial.map(k => `<span class="chip partial" title="Matched via synonym '${esc(k.via)}' — half credit. Use the posting's exact word for full credit.">≈ ${k.req ? '<span class="reqmark">★</span> ' : ''}${esc(k.term)}</span>`).join('')}${!res.found.length && !res.partial.length ? '<span class="hint">None yet</span>' : ''}</div>
       </div>
       <div class="kw-col">
         <h4 class="miss">✗ Missing — click to add to Skills (${res.missing.length})</h4>
@@ -912,7 +1094,7 @@ function renderJobDetail() {
       <div class="toolbar" style="margin-bottom:12px;">
         <h3 style="margin:0;">Application details</h3>
         <span class="spacer"></span>
-        ${job.url ? `<a class="btn small" href="${esc(job.url)}" target="_blank" rel="noopener">Open posting ↗</a>` : ''}
+        ${safeUrl(job.url) ? `<a class="btn small" href="${esc(safeUrl(job.url))}" target="_blank" rel="noopener">Open posting ↗</a>` : ''}
         <button class="btn small ghost danger" data-action="del-job" data-id="${job.id}">Delete application</button>
       </div>
       <div class="grid3">
@@ -943,13 +1125,14 @@ function renderJobDetail() {
       </div>
       <label>Experience — untick roles to hide them for this job; reword bullets to mirror the posting</label>
       ${job.tailored.experience.map(te => {
-        const m = p.experience.find(e => e.id === te.expId);
+        const m = p.experience.find(e => e.id === te.expId) || te.snapshot;
         if (!m) return '';
+        const orphan = !p.experience.some(e => e.id === te.expId);
         return `
         <div class="item-card" style="${te.include ? '' : 'opacity:.55;'}">
           <div class="item-head">
             <span class="title"><label style="display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--text);cursor:pointer;">
-              <input type="checkbox" data-jobinc="${job.id}" data-exp="${te.expId}" ${te.include?'checked':''}> ${esc(m.title)} — ${esc(m.company)}</label></span>
+              <input type="checkbox" data-jobinc="${job.id}" data-exp="${te.expId}" ${te.include?'checked':''}> ${esc(m.title)} — ${esc(m.company)}${orphan ? ' <span class="hint">(kept — role was removed from master)</span>' : ''}</label></span>
           </div>
           ${te.include ? `<textarea data-jobbul="${job.id}" data-exp="${te.expId}" rows="4">${esc(te.bullets.join('\n'))}</textarea>` : ''}
         </div>`;
@@ -962,13 +1145,13 @@ function renderJobDetail() {
       <textarea data-job="${job.id}" data-f="coverLetter" rows="12" placeholder="Click Generate draft after analyzing the posting.">${esc(job.coverLetter || '')}</textarea>
       <div class="toolbar" style="margin-top:10px; margin-bottom:0;">
         <button class="btn small" data-action="copy-cover" data-id="${job.id}">Copy</button>
-        <button class="btn small" data-action="download-cover" data-id="${job.id}">Download Word (.doc)</button>
+        <button class="btn small" data-action="download-cover" data-id="${job.id}">Download Word (.docx)</button>
       </div>
     </div>
     <div class="card">
       <h3>Apply Kit — a real application in ~2 minutes</h3>
       <div class="toolbar" style="margin-bottom:0;">
-        ${job.url ? `<a class="btn primary" href="${esc(job.url)}" target="_blank" rel="noopener">1 · Open posting ↗</a>` : '<span class="hint">No posting link saved — paste the job URL into Notes, or add jobs via Find Jobs / the browser button to capture it automatically.</span>'}
+        ${safeUrl(job.url) ? `<a class="btn primary" href="${esc(safeUrl(job.url))}" target="_blank" rel="noopener">1 · Open posting ↗</a>` : '<span class="hint">No posting link saved — paste the job URL into Notes, or add jobs via Find Jobs / the browser button to capture it automatically.</span>'}
         <button class="btn" data-action="copy-resume-text" data-id="${job.id}">2 · Copy tailored resume</button>
         <button class="btn" data-action="copy-cover" data-id="${job.id}">3 · Copy cover letter</button>
         <button class="btn" data-action="goto-preview" data-id="${job.id}">or download PDF/.doc →</button>
@@ -986,7 +1169,7 @@ function genCoverLetter(job) {
   const res = job.analysis ? scoreResume(job.id, job.analysis.keywords) : null;
   const terms = res && res.found.length ? res.found.map(k => k.term) : job.tailored.skills.map(s => s.toLowerCase());
   const roles = job.tailored.experience.filter(t => t.include)
-    .map(t => ({ t, m: p.experience.find(e => e.id === t.expId) })).filter(x => x.m);
+    .map(t => ({ t, m: p.experience.find(e => e.id === t.expId) || t.snapshot })).filter(x => x.m);
   const recent = roles[0];
   const proof = roles.flatMap(x => x.t.bullets).map(b => b.trim()).filter(b => b && /\d/.test(b)).slice(0, 2);
 
@@ -1120,7 +1303,7 @@ function resumePlainText(version) {
   L.push([c.location, c.phone, c.email, c.linkedin, c.website].filter(Boolean).join(' | '));
   const sec = t => { L.push(''); L.push(t.toUpperCase()); L.push('-'.repeat(t.length)); };
   if (r.summary?.trim()) { sec('Professional Summary'); L.push(r.summary.trim()); }
-  if (r.skills.length) { sec('Skills'); L.push(r.skills.join(' • ')); }
+  if (r.skills.length) { sec('Skills'); L.push(r.skills.join(', ')); }
   if (r.experience.length) {
     sec('Professional Experience');
     for (const e of r.experience) {
@@ -1167,9 +1350,12 @@ function atsAudit(version) {
 
   // Experience
   if (!r.experience.length) add('fail', 'No work experience', 'Add roles on the Profile tab.');
+  const DATE_OK = /^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.? \d{4}$/i;
   for (const e of r.experience) {
     const name = `${e.title || 'Untitled'} @ ${e.company || '?'}`;
     if (!e.start) add('warn', `Missing dates — ${name}`, 'ATS parse and recruiters check employment dates; use "Jun 2021" style.');
+    else if (!DATE_OK.test(String(e.start).trim())) add('warn', `Start date format — ${name}`, `"${e.start}" — parsers compute years-of-experience from dates; "Mar 2021" style parses most reliably (avoid year-only or 03/2021).`);
+    if (e.end && !e.current && !/^present$/i.test(String(e.end).trim()) && !DATE_OK.test(String(e.end).trim())) add('warn', `End date format — ${name}`, `"${e.end}" — use "Jul 2025" or "Present".`);
     const bullets = e.bullets.filter(b => b.trim());
     if (!bullets.length) add('warn', `No bullets — ${name}`, 'Every role needs 3–6 accomplishment bullets.');
     else {
@@ -1180,17 +1366,51 @@ function atsAudit(version) {
       if (bullets.length >= 2 && quant.length === 0) add('warn', `No numbers in bullets — ${name}`, 'Add quantities: team size, volume/day, %, $, time saved.');
       const tooLong = bullets.filter(b => b.length > 230);
       if (tooLong.length) add('warn', `Very long bullet(s) — ${name}`, 'Keep bullets to 1–2 lines.');
+      const typo = bullets.filter(b => /\b(\w+)\s+\1\b/i.test(b) || /\s{2,}|\.\./.test(b.trim()));
+      if (typo.length) add('warn', `Possible typo — ${name}`, `Doubled word, double space, or stray punctuation in: "${typo[0].slice(0, 60)}…"`);
     }
   }
 
-  // Length
+  // Employment gaps > 6 months (a commonly configured screening filter)
+  {
+    const MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+    const parseMY = v => {
+      const m = String(v || '').trim().toLowerCase().match(/^([a-z]+)\.? (\d{4})$/);
+      return m && MONTHS[m[1].slice(0, 3)] !== undefined ? (+m[2]) * 12 + MONTHS[m[1].slice(0, 3)] : null;
+    };
+    const nowM = new Date().getFullYear() * 12 + new Date().getMonth();
+    const spans = r.experience.map(e => {
+      const st = parseMY(e.start);
+      const en = (e.current || /^present$/i.test(String(e.end || '').trim())) ? nowM : parseMY(e.end);
+      return st !== null && en !== null && en >= st ? [st, en] : null;
+    }).filter(Boolean).sort((a, b) => a[0] - b[0]);
+    if (spans.length >= 2) {
+      let covEnd = spans[0][1];
+      for (let i = 1; i < spans.length; i++) {
+        const [st, en] = spans[i];
+        if (st - covEnd > 6) add('warn', `Employment gap of ~${st - covEnd} months`, 'Gaps over ~6 months are a commonly configured screening filter — a one-line explanation (caregiving, education, freelance) turns a hole into a chapter.');
+        covEnd = Math.max(covEnd, en);
+      }
+    }
+  }
+
+  // Quantification across the whole resume (≥5 numeric bullets is a real differentiator)
+  {
+    const allB = r.experience.flatMap(e => e.bullets).map(b => b.trim()).filter(Boolean);
+    const quantTotal = allB.filter(b => /\d/.test(b)).length;
+    if (allB.length >= 6 && quantTotal < 5) add('warn', `Only ${quantTotal} quantified bullet${quantTotal === 1 ? '' : 's'} overall`, 'Recruiters and AI screeners reward numbers; roughly 1 in 4 resumes has 5+ quantified bullets — be one of them.');
+  }
+
+  // Length — studied sweet spot for experienced candidates is roughly 450–850 words
   const words = resumePlainText(version).split(/\s+/).filter(Boolean).length;
-  if (words < 250) add('warn', `Resume is short (${words} words)`, 'Under ~250 words looks thin; add bullets and skills.');
-  else if (words > 900) add('warn', `Resume is long (${words} words)`, 'Over ~900 words usually means 3+ pages; cut to what matters for this job.');
-  else add('pass', `Good length (${words} words)`, 'Roughly 1–2 pages.');
+  if (words < 250) add('fail', `Resume is very short (${words} words)`, 'Reads as thin for any experienced candidate — add roles, bullets, and skills.');
+  else if (words < 400) add('warn', `On the short side (${words} words)`, 'The studied sweet spot is ~450–850 words for experienced candidates; add accomplishments, not padding.');
+  else if (words <= 850) add('pass', `Good length (${words} words)`, 'In the ~450–850 sweet spot. Two pages is fine for 10+ years of experience.');
+  else if (words <= 1000) add('warn', `Getting long (${words} words)`, 'Fine if every line earns its place; trim anything not relevant to this job.');
+  else add('warn', `Resume is long (${words} words)`, 'Over ~1,000 words usually means 3+ pages; cut to the most relevant two.');
 
   // Format guarantees (inherent to this tool)
-  add('pass', 'ATS-safe formatting guaranteed', 'Single column, standard headings, no tables/graphics/headers — every export from this tool parses cleanly.');
+  add('pass', 'ATS-safe layout by construction', 'Single column, standard headings, real text, no tables/graphics/headers-footers — the layout traps that break parsers are designed out.');
 
   // Keyword tie-in for tailored versions
   if (version !== 'master') {
@@ -1238,7 +1458,7 @@ function renderPreview() {
   if (v !== 'master') {
     const job = state.jobs.find(j => j.id === v);
     scoreCard.style.display = '';
-    if (job?.analysis) {
+    if (job?.analysis?.keywords?.length) {
       const g = computeGrade(v);
       scoreCard.innerHTML = `<h3>Grade</h3>
         <div class="score-row">${scoreRingHTML(g.pct)}<div class="score-desc"><strong>${g.letter} — ${esc(job.title||'')} @ ${esc(job.company||'')}</strong><br>${g.kwRes ? `${g.kwRes.found.length} of ${g.kwRes.found.length + g.kwRes.missing.length} posting keywords covered.` : ''}</div></div>
@@ -1270,22 +1490,121 @@ function download(filename, content, mime) {
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
-function exportDoc(version) {
-  // HTML-based .doc — opens in Word/Google Docs, save-as .docx from there.
-  const docHtml = `<!DOCTYPE html><html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>Resume</title>
-<style>
-  body { font-family: Calibri, Arial, sans-serif; font-size: 10.5pt; color:#111; line-height:1.35; margin: 0.6in 0.7in; }
-  h1 { font-size: 19pt; margin: 0; } .contact { font-size: 10pt; margin: 2pt 0 0; }
-  h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1pt solid #333; padding-bottom: 2pt; margin: 12pt 0 5pt; }
-  .r-job-head, .r-job-sub { } .r-job-head span, .r-job-sub span {}
-  ul { margin: 3pt 0; padding-left: 18pt; } li { margin-bottom: 2pt; }
-  .r-name { font-size: 19pt; font-weight:bold; } .r-contact { font-size: 10pt; }
-  .r-sec { font-size: 11pt; font-weight:bold; text-transform: uppercase; letter-spacing:1px; border-bottom:1pt solid #333; padding-bottom:2pt; margin:12pt 0 5pt; }
-  .r-job { margin-bottom: 8pt; } .r-job-head { font-weight: bold; } .r-job-sub { font-style: italic; font-size: 10pt; }
-  .r-job-head { display:block; } .r-job-head span:last-child { float:right; }
-</style></head><body>${resumeHTML(version)}</body></html>`;
-  download(suggestedFilename(version, 'doc'), docHtml, 'application/msword');
-  toast('Word file downloaded — open it and Save As .docx if a posting requires docx');
+/* ---------- Real .docx (OOXML) writer — zero dependencies ----------
+   ATS upload validators detect file type by content; genuine OOXML is
+   first-class input everywhere, unlike HTML masquerading as .doc. */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    t[i] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+// Minimal ZIP with stored (uncompressed) entries — a valid .docx container.
+function makeZip(files) {
+  const enc = new TextEncoder();
+  const parts = [], central = [];
+  let offset = 0;
+  for (const f of files) {
+    const nameB = enc.encode(f.name), data = enc.encode(f.text), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true);
+    h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true);
+    h.setUint16(26, nameB.length, true);
+    parts.push(new Uint8Array(h.buffer), nameB, data);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true);
+    c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true);
+    c.setUint16(28, nameB.length, true); c.setUint32(42, offset, true);
+    central.push(new Uint8Array(c.buffer), nameB);
+    offset += 30 + nameB.length + data.length;
+  }
+  const centralSize = central.reduce((sum, a) => sum + a.length, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+  end.setUint32(12, centralSize, true); end.setUint32(16, offset, true);
+  const all = [...parts, ...central, new Uint8Array(end.buffer)];
+  const out = new Uint8Array(all.reduce((sum, a) => sum + a.length, 0));
+  let pos = 0;
+  for (const a of all) { out.set(a, pos); pos += a.length; }
+  return out;
+}
+const xesc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// para: { runs:[{t,b,i,size,caps,tab}], size (half-points), spaceBefore/After (twips), border, indent, tabRight }
+function docxParagraph(p) {
+  const props = [];
+  if (p.spaceBefore || p.spaceAfter) props.push(`<w:spacing w:before="${p.spaceBefore || 0}" w:after="${p.spaceAfter || 0}"/>`);
+  if (p.border) props.push('<w:pBdr><w:bottom w:val="single" w:sz="8" w:space="2" w:color="333333"/></w:pBdr>');
+  if (p.tabRight) props.push('<w:tabs><w:tab w:val="right" w:pos="9360"/></w:tabs>');
+  if (p.indent) props.push(`<w:ind w:left="${p.indent}" w:hanging="180"/>`);
+  const runs = (p.runs || []).map(r => {
+    const rp = [];
+    if (r.b) rp.push('<w:b/>');
+    if (r.i) rp.push('<w:i/>');
+    if (r.caps) rp.push('<w:caps/>');
+    rp.push(`<w:sz w:val="${r.size || p.size || 21}"/>`);
+    return `<w:r><w:rPr>${rp.join('')}</w:rPr>${r.tab ? '<w:tab/>' : `<w:t xml:space="preserve">${xesc(r.t)}</w:t>`}</w:r>`;
+  }).join('');
+  return `<w:p><w:pPr>${props.join('')}</w:pPr>${runs}</w:p>`;
+}
+function makeDocx(paras) {
+  const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
+${paras.map(docxParagraph).join('\n')}
+<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="810" w:right="936" w:bottom="810" w:left="936"/></w:sectPr>
+</w:body></w:document>`;
+  return makeZip([
+    { name: '[Content_Types].xml', text: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>` },
+    { name: '_rels/.rels', text: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>` },
+    { name: 'word/document.xml', text: doc }
+  ]);
+}
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+function resumeDocxParas(version) {
+  const r = buildResumeData(version);
+  const c = r.contact;
+  const P = [];
+  const sec = t => P.push({ runs: [{ t, b: true, caps: true }], size: 22, border: true, spaceBefore: 220, spaceAfter: 80 });
+  P.push({ runs: [{ t: c.name || 'Your Name', b: true, size: 38 }], spaceAfter: 40 });
+  P.push({ runs: [{ t: [c.location, c.phone, c.email, c.linkedin, c.website].filter(Boolean).join(' | ') }], size: 20, spaceAfter: 120 });
+  if (r.summary?.trim()) { sec('Professional Summary'); P.push({ runs: [{ t: r.summary.trim() }], spaceAfter: 80 }); }
+  if (r.skills.length) { sec('Skills'); P.push({ runs: [{ t: r.skills.join(', ') }], spaceAfter: 80 }); }
+  if (r.experience.length) {
+    sec('Professional Experience');
+    for (const e of r.experience) {
+      const dates = [e.start, e.current ? 'Present' : e.end].filter(Boolean).join(' – ');
+      P.push({ runs: [{ t: e.title || '', b: true }, { tab: true }, { t: dates, b: true }], tabRight: true, spaceBefore: 100 });
+      P.push({ runs: [{ t: `${e.company || ''}${e.location ? ', ' + e.location : ''}`, i: true }], size: 20, spaceAfter: 40 });
+      for (const b of e.bullets.filter(x => x.trim())) P.push({ runs: [{ t: '• ' + b.trim() }], indent: 360, spaceAfter: 20 });
+    }
+  }
+  if (r.education.length) {
+    sec('Education');
+    for (const e of r.education) P.push({ runs: [{ t: e.degree || '', b: true }, { t: `${e.school ? ' — ' + e.school : ''}${e.gradDate ? ', ' + e.gradDate : ''}` }], spaceAfter: 40 });
+  }
+  const certs = (r.certifications || '').split('\n').map(x => x.trim()).filter(Boolean);
+  if (certs.length) { sec('Certifications'); for (const x of certs) P.push({ runs: [{ t: '• ' + x }], indent: 360, spaceAfter: 20 }); }
+  return P;
+}
+function exportDocx(version) {
+  download(suggestedFilename(version, 'docx'), makeDocx(resumeDocxParas(version)), DOCX_MIME);
+  toast('.docx downloaded — the most reliably parsed upload format (Workday, iCIMS, Taleo)');
+}
+function exportCoverDocx(job) {
+  const paras = job.coverLetter.split('\n').map(l => ({ runs: [{ t: l || ' ' }], size: 22, spaceAfter: l.trim() ? 40 : 160 }));
+  const name = (state.profile.contact.name || 'Cover-Letter').trim().replace(/\s+/g, '-');
+  const co = (job.company || 'Company').trim().replace(/\s+/g, '-');
+  download(`${name}-Cover-Letter-${co}.docx`.replace(/[^A-Za-z0-9.-]/g, ''), makeDocx(paras), DOCX_MIME);
+  toast('Cover letter .docx downloaded');
 }
 
 /* ================================================================
@@ -1333,7 +1652,7 @@ function renderBookmarklet() {
     zone.innerHTML = '<p style="margin:0;">Run the app via <code>Start ResumeForge.command</code> to enable the browser button.</p>';
     return;
   }
-  const src = `(function(){var s=window.getSelection().toString();var el=document.querySelector('#jobDescriptionText,.jobs-description__content,.description__text,.jobsearch-JobComponent-description,[class*="jobDescription"]');var t=(s&&s.length>200)?s:(el?el.innerText:document.body.innerText);t=t.slice(0,30000);fetch('${location.origin}/api/clip',{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({title:document.title,url:location.href,text:t})}).then(function(){alert('Sent to ResumeForge \\u2713')}).catch(function(){alert('ResumeForge is not running. Start it, then try again.')})})()`;
+  const src = `(function(){var s=window.getSelection().toString();var el=document.querySelector('#jobDescriptionText,.jobs-description__content,.description__text,.jobsearch-JobComponent-description,[class*="jobDescription"]');var t=(s&&s.length>200)?s:(el?el.innerText:document.body.innerText);t=t.slice(0,30000);fetch('${location.origin}/api/clip',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({title:document.title,url:location.href,text:t})}).then(function(){alert('Sent to ResumeForge \\u2713')}).catch(function(){alert('ResumeForge is not running. Start it, then try again.')})})()`;
   zone.innerHTML = `
     <p style="margin-top:0;"><strong>One-time setup:</strong> drag this button to your browser's bookmarks bar:</p>
     <p><a id="bm-link" class="btn primary" style="text-decoration:none;">📋 Grade in ResumeForge</a></p>
@@ -1341,7 +1660,18 @@ function renderBookmarklet() {
   document.getElementById('bm-link').href = 'javascript:' + encodeURIComponent(src);
 }
 
+function ageBadge(posted) {
+  const t = Date.parse(posted || '');
+  if (!t) return '';
+  const days = Math.floor((Date.now() - t) / 864e5);
+  if (days < 0) return '';
+  if (days <= 4) return `<span class="status-badge status-offer" title="Recruiters work newest-first — early applications get seen far more often">${days === 0 ? 'posted today' : days + 'd ago'} · fresh, apply soon</span>`;
+  if (days <= 14) return `<span class="status-badge status-saved">${days}d ago</span>`;
+  return `<span class="status-badge status-saved" style="opacity:.7;">${Math.round(days / 7)}w old — may be filled</span>`;
+}
+
 function quickGrade(description) {
+  if ((description || '').trim().length < 300) return null; // snippets grade unreliably
   const kws = extractKeywords(description);
   if (!kws.length) return null;
   const res = scoreResume('master', kws);
@@ -1376,25 +1706,25 @@ function renderSearchResults(errors = []) {
   if (!el) return;
   const errHtml = errors.length ? `<div class="card" style="border-color:var(--amber); background:var(--amber-soft); font-size:13px;">${errors.map(esc).join('<br>')}</div>` : '';
   if (!searchResults.length) { el.innerHTML = errHtml; return; }
-  el.innerHTML = errHtml + `<p class="sub" style="margin:4px 0 10px;">${searchResults.length} jobs, sorted by how well your <strong>master resume</strong> already matches. Add one to tailor it and raise the grade.</p>` +
+  el.innerHTML = errHtml + `<p class="sub" style="margin:4px 0 10px;">${searchResults.length} jobs, sorted by how well your <strong>master resume</strong> already matches. Freshness matters as much as fit — recruiters work newest-first, so favor the green-badged postings.</p>` +
     searchResults.map((r, i) => `
     <div class="item-card" style="background:var(--surface);">
       <div class="item-head">
         <span class="title">${esc(r.title)}</span>
         ${r.match != null ? `<span class="mini-score" style="color:${ringColor(r.match)}; font-size:14px;">${letterFor(r.match)} · ${r.match}%</span>` : ''}
       </div>
-      <div class="jc" style="margin:-6px 0 6px;">${esc(r.company)}${r.location ? ' — ' + esc(r.location) : ''} · via ${esc(r.source)}</div>
+      <div class="jc" style="margin:-6px 0 6px;">${esc(r.company)}${r.location ? ' — ' + esc(r.location) : ''} · via ${esc(r.source)} ${ageBadge(r.posted)}${r.match == null ? ' <span class="hint">(partial text — Add &amp; tailor for a real grade)</span>' : ''}</div>
       <p style="font-size:13px; color:var(--muted); margin:0 0 10px;">${esc((r.description || '').slice(0, 240))}…</p>
       <div class="toolbar" style="margin:0;">
         <button class="btn small primary" data-action="add-search-job" data-i="${i}">Add &amp; tailor →</button>
-        ${r.url ? `<a class="btn small" href="${esc(r.url)}" target="_blank" rel="noopener">Open posting ↗</a>` : ''}
+        ${safeUrl(r.url) ? `<a class="btn small" href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener">Open posting ↗</a>` : ''}
       </div>
     </div>`).join('');
 }
 
 function createJobFrom({ title, company, jd, url }) {
   const job = {
-    id: uid(), title: title || '', company: company || '', jd: jd || '', url: url || '',
+    id: uid(), title: title || '', company: company || '', jd: jd || '', url: safeUrl(url),
     status: 'saved', dateApplied: '', notes: '', coverLetter: '',
     createdAt: new Date().toISOString(), tailored: makeTailored(), analysis: null
   };
@@ -1524,9 +1854,14 @@ document.getElementById('import-file').addEventListener('change', e => {
     try {
       const data = JSON.parse(reader.result);
       if (!data.profile) throw new Error('not a ResumeForge backup');
-      state = Object.assign(defaultState(), data, { ui: Object.assign(defaultState().ui, data.ui || {}) });
-      save(); renderProfile(); renderJobs(); renderPreview();
-      toast('Backup restored ✓');
+      const cur = `${state.jobs.length} application(s), profile "${state.profile.contact.name || 'unnamed'}"`;
+      const inc = `${(data.jobs || []).length} application(s), profile "${data.profile?.contact?.name || 'unnamed'}"`;
+      if (!confirm(`Replace your current data (${cur}) with this backup (${inc})?\n\nYour current data will be stashed and recoverable until the next restore.`)) return;
+      try { localStorage.setItem(STORE_KEY + '_prev', JSON.stringify(state)); } catch (err) { /* stash is best-effort */ }
+      const d = defaultState();
+      state = normalizeState(Object.assign(d, data, { ui: Object.assign(d.ui, data.ui || {}), keys: Object.assign(d.keys, data.keys || {}) }));
+      flushNow(); renderProfile(); renderJobs(); renderPreview();
+      toast('Backup restored ✓ (previous data stashed)');
     } catch (err) { toast('⚠ Could not read that file: ' + err.message); }
   };
   reader.readAsText(f);
@@ -1544,7 +1879,12 @@ document.addEventListener('click', e => {
     save(); renderExperience();
   }
   else if (a === 'del-exp') {
-    if (!confirm('Delete this job from your master profile? Tailored copies in existing applications keep their text until you delete them.')) return;
+    if (!confirm('Delete this role from your master profile? Existing applications keep their tailored copy of it.')) return;
+    const gone = state.profile.experience.find(x => x.id === el.dataset.id);
+    if (gone) for (const j of state.jobs) {
+      const te = j.tailored?.experience?.find(t => t.expId === gone.id);
+      if (te && !te.snapshot) te.snapshot = { title: gone.title, company: gone.company, location: gone.location, start: gone.start, end: gone.end, current: gone.current };
+    }
     state.profile.experience = state.profile.experience.filter(x => x.id !== el.dataset.id);
     save(); renderExperience();
   }
@@ -1559,6 +1899,7 @@ document.addEventListener('click', e => {
     save(); renderEducation();
   }
   else if (a === 'del-edu') {
+    if (!confirm('Delete this education entry?')) return;
     state.profile.education = state.profile.education.filter(x => x.id !== el.dataset.id);
     save(); renderEducation();
   }
@@ -1586,9 +1927,11 @@ document.addEventListener('click', e => {
     const job = state.jobs.find(j => j.id === el.dataset.id);
     if (!job) return;
     if ((job.jd || '').trim().length < 60) { toast('Paste the full job posting first — the more text, the better the analysis.'); return; }
-    job.analysis = { keywords: extractKeywords(job.jd), at: new Date().toISOString() };
+    const kws = extractKeywords(job.jd);
+    if (!kws.length) { job.analysis = null; save(); renderJobs(); toast('⚠ No keywords found — paste the complete posting text and try again'); return; }
+    job.analysis = { keywords: kws, at: new Date().toISOString() };
     save(); renderJobs();
-    toast('Analyzed — ' + job.analysis.keywords.length + ' keywords extracted');
+    toast('Analyzed — ' + kws.length + ' keywords extracted');
   }
   else if (a === 'add-missing') {
     const job = state.jobs.find(j => j.id === el.dataset.job);
@@ -1630,13 +1973,7 @@ document.addEventListener('click', e => {
   else if (a === 'download-cover') {
     const job = state.jobs.find(j => j.id === el.dataset.id);
     if (!job?.coverLetter?.trim()) { toast('Nothing to download yet — generate a draft first'); return; }
-    const name = (state.profile.contact.name || 'Cover-Letter').trim().replace(/\s+/g, '-');
-    const co = (job.company || 'Company').trim().replace(/\s+/g, '-');
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cover Letter</title>
-<style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.5;color:#111;margin:1in;}</style></head>
-<body>${job.coverLetter.split('\n').map(l => `<p style="margin:0 0 ${l.trim() ? '0' : '10pt'};">${esc(l) || '&nbsp;'}</p>`).join('')}</body></html>`;
-    download(`${name}-Cover-Letter-${co}.doc`.replace(/[^A-Za-z0-9.-]/g, ''), html, 'application/msword');
-    toast('Cover letter downloaded');
+    exportCoverDocx(job);
   }
   else if (a === 'copy-prep') {
     const job = state.jobs.find(j => j.id === el.dataset.id);
@@ -1656,10 +1993,10 @@ document.addEventListener('click', e => {
   else if (a === 'download-txt') {
     download(suggestedFilename(state.ui.previewTarget, 'txt'), resumePlainText(state.ui.previewTarget), 'text/plain');
   }
-  else if (a === 'download-doc') exportDoc(state.ui.previewTarget);
+  else if (a === 'download-doc') exportDocx(state.ui.previewTarget);
   else if (a === 'print-pdf') {
     document.getElementById('print-area').innerHTML = resumeHTML(state.ui.previewTarget);
-    toast('In the print dialog choose "Save as PDF"');
+    toast('Print dialog: choose "Save as PDF" — and under More settings, UNCHECK "Headers and footers"');
     setTimeout(() => window.print(), 150);
   }
   else if (a === 'export-json') {
