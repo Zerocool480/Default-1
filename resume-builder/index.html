@@ -766,7 +766,115 @@ function renderJobDetail() {
         </div>`;
       }).join('')}
       <button class="btn" data-action="goto-preview" data-id="${job.id}" style="margin-top:6px;">Preview &amp; export this version →</button>
-    </div>`;
+    </div>
+    <div class="card">
+      <h3>Cover letter <button class="btn small primary" data-action="gen-cover" data-id="${job.id}">${job.coverLetter?.trim() ? 'Regenerate' : 'Generate draft'}</button></h3>
+      <p class="hint" style="margin-bottom:10px;">Generated from your tailored resume and the posting's keywords — then make it yours. If you can find the hiring manager's name, swap it in; it noticeably lifts response rates.</p>
+      <textarea data-job="${job.id}" data-f="coverLetter" rows="12" placeholder="Click Generate draft after analyzing the posting.">${esc(job.coverLetter || '')}</textarea>
+      <div class="toolbar" style="margin-top:10px; margin-bottom:0;">
+        <button class="btn small" data-action="copy-cover" data-id="${job.id}">Copy</button>
+        <button class="btn small" data-action="download-cover" data-id="${job.id}">Download Word (.doc)</button>
+      </div>
+    </div>
+    ${prepHTML(job)}`;
+}
+
+/* ================================================================
+   COVER LETTER & INTERVIEW PREP
+================================================================ */
+function genCoverLetter(job) {
+  const p = state.profile, c = p.contact;
+  const res = job.analysis ? scoreResume(job.id, job.analysis.keywords) : null;
+  const terms = res && res.found.length ? res.found.map(k => k.term) : job.tailored.skills.map(s => s.toLowerCase());
+  const roles = job.tailored.experience.filter(t => t.include)
+    .map(t => ({ t, m: p.experience.find(e => e.id === t.expId) })).filter(x => x.m);
+  const recent = roles[0];
+  const proof = roles.flatMap(x => x.t.bullets).map(b => b.trim()).filter(b => b && /\d/.test(b)).slice(0, 2);
+
+  const title = job.title || 'open position';
+  const company = job.company || 'your company';
+  const L = [];
+  L.push(`Dear Hiring Manager,`);
+  L.push('');
+  let opener = `I'm excited to apply for the ${title} position at ${company}.`;
+  const summary = (job.tailored.summary || p.summary || '').trim();
+  if (summary) opener += ' ' + summary.split(/(?<=[.!?])\s+/)[0];
+  L.push(opener);
+  L.push('');
+  if (recent) {
+    let body = `In my ${recent.m.end && recent.m.end.toLowerCase() !== 'present' ? 'role' : 'current role'} as ${recent.m.title} at ${recent.m.company}, I've built exactly the experience this position calls for.`;
+    if (proof.length) {
+      body += ' Highlights include: ' + proof.map(b => b.charAt(0).toLowerCase() + b.slice(1).replace(/\.$/, '')).join('; ') + '.';
+    }
+    L.push(body);
+    L.push('');
+  }
+  if (terms.length) {
+    L.push(`Your posting emphasizes ${terms.slice(0, 3).join(', ')}${terms.length > 3 ? `, and ${terms[3]}` : ''} — all areas I work in daily and would bring to ${company} from day one.`);
+    L.push('');
+  }
+  L.push(`I'd welcome the chance to talk about how I can contribute to your team. Thank you for your time and consideration.`);
+  L.push('');
+  L.push('Sincerely,');
+  L.push(c.name || 'Your Name');
+  const contactLine = [c.phone, c.email].filter(Boolean).join(' | ');
+  if (contactLine) L.push(contactLine);
+  return L.join('\n');
+}
+
+function prepHTML(job) {
+  if (!job.analysis) return '';
+  const res = scoreResume(job.id, job.analysis.keywords);
+  if (!res) return '';
+  const topTerms = job.analysis.keywords.slice(0, 10).map(k => k.term);
+  const questions = [
+    `Tell me about yourself. (Answer with your tailored summary — it's already written for this job.)`,
+    `Why do you want to work at ${job.company || 'this company'}?`,
+    ...job.analysis.keywords.slice(0, 4).map(k => `Tell me about your experience with ${k.term}.`),
+    `Describe a time you dealt with a difficult customer or coworker.`,
+    `What are your strengths, and one area you're improving?`
+  ];
+  const p = state.profile;
+  const proof = job.tailored.experience.filter(t => t.include)
+    .flatMap(t => t.bullets).map(b => b.trim()).filter(b => b && /\d/.test(b)).slice(0, 6);
+  return `
+  <div class="card" id="prep-card">
+    <h3>Interview prep sheet <button class="btn small" data-action="copy-prep" data-id="${job.id}">Copy</button></h3>
+    <p class="hint" style="margin-bottom:10px;">Built from this posting's analysis. Review it the night before and in the parking lot.</p>
+    <h4 style="margin:10px 0 4px; font-size:13px;">Words to say out loud (they're searching/listening for these)</h4>
+    <div class="chips">${topTerms.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>
+    <h4 style="margin:14px 0 4px; font-size:13px;">Questions to expect</h4>
+    <ul style="margin:0; padding-left:20px; font-size:13.5px;">${questions.map(q => `<li>${esc(q)}</li>`).join('')}</ul>
+    <h4 style="margin:14px 0 4px; font-size:13px;">Your proof points — rehearse these as short stories (situation → what you did → result)</h4>
+    ${proof.length ? `<ul style="margin:0; padding-left:20px; font-size:13.5px;">${proof.map(b => `<li>${esc(b)}</li>`).join('')}</ul>`
+      : '<p class="hint">No quantified bullets yet — add numbers to your experience bullets and they\'ll show up here.</p>'}
+  </div>`;
+}
+
+function prepPlainText(job) {
+  if (!job.analysis) return 'Analyze the posting first.';
+  const topTerms = job.analysis.keywords.slice(0, 10).map(k => k.term);
+  const questions = [
+    `Tell me about yourself. (Use your tailored summary.)`,
+    `Why do you want to work at ${job.company || 'this company'}?`,
+    ...job.analysis.keywords.slice(0, 4).map(k => `Tell me about your experience with ${k.term}.`),
+    `Describe a time you dealt with a difficult customer or coworker.`,
+    `What are your strengths, and one area you're improving?`
+  ];
+  const proof = job.tailored.experience.filter(t => t.include)
+    .flatMap(t => t.bullets).map(b => b.trim()).filter(b => b && /\d/.test(b)).slice(0, 6);
+  return [
+    `INTERVIEW PREP — ${job.title || ''} @ ${job.company || ''}`,
+    '',
+    'WORDS TO SAY OUT LOUD:',
+    topTerms.join(' • '),
+    '',
+    'QUESTIONS TO EXPECT:',
+    ...questions.map(q => '- ' + q),
+    '',
+    'YOUR PROOF POINTS (rehearse as situation → action → result):',
+    ...proof.map(b => '- ' + b)
+  ].join('\n').trim();
 }
 
 function renderJobs() { renderJobList(); renderJobDetail(); }
@@ -1104,7 +1212,7 @@ document.addEventListener('click', e => {
   }
   else if (a === 'focus-skill') document.getElementById('skill-input').focus();
   else if (a === 'add-job') {
-    const job = { id: uid(), title: '', company: '', jd: '', status: 'saved', dateApplied: '', notes: '', createdAt: new Date().toISOString(), tailored: makeTailored(), analysis: null };
+    const job = { id: uid(), title: '', company: '', jd: '', status: 'saved', dateApplied: '', notes: '', coverLetter: '', createdAt: new Date().toISOString(), tailored: makeTailored(), analysis: null };
     state.jobs.unshift(job);
     state.ui.selectedJob = job.id;
     save(); renderJobs();
@@ -1134,6 +1242,39 @@ document.addEventListener('click', e => {
       save(); renderJobDetail();
       toast(`Added "${term}" to this job's skills`);
     }
+  }
+  else if (a === 'gen-cover') {
+    const job = state.jobs.find(j => j.id === el.dataset.id);
+    if (!job) return;
+    if (job.coverLetter?.trim() && !confirm('Replace the current cover letter with a fresh draft?')) return;
+    job.coverLetter = genCoverLetter(job);
+    save(); renderJobDetail();
+    toast('Draft generated — now personalize it');
+  }
+  else if (a === 'copy-cover') {
+    const job = state.jobs.find(j => j.id === el.dataset.id);
+    if (!job?.coverLetter?.trim()) { toast('Nothing to copy yet — generate a draft first'); return; }
+    navigator.clipboard.writeText(job.coverLetter)
+      .then(() => toast('Cover letter copied'))
+      .catch(() => toast('⚠ Copy failed — select the text and copy manually'));
+  }
+  else if (a === 'download-cover') {
+    const job = state.jobs.find(j => j.id === el.dataset.id);
+    if (!job?.coverLetter?.trim()) { toast('Nothing to download yet — generate a draft first'); return; }
+    const name = (state.profile.contact.name || 'Cover-Letter').trim().replace(/\s+/g, '-');
+    const co = (job.company || 'Company').trim().replace(/\s+/g, '-');
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cover Letter</title>
+<style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.5;color:#111;margin:1in;}</style></head>
+<body>${job.coverLetter.split('\n').map(l => `<p style="margin:0 0 ${l.trim() ? '0' : '10pt'};">${esc(l) || '&nbsp;'}</p>`).join('')}</body></html>`;
+    download(`${name}-Cover-Letter-${co}.doc`.replace(/[^A-Za-z0-9.-]/g, ''), html, 'application/msword');
+    toast('Cover letter downloaded');
+  }
+  else if (a === 'copy-prep') {
+    const job = state.jobs.find(j => j.id === el.dataset.id);
+    if (!job) return;
+    navigator.clipboard.writeText(prepPlainText(job))
+      .then(() => toast('Prep sheet copied'))
+      .catch(() => toast('⚠ Copy failed'));
   }
   else if (a === 'goto-preview') {
     state.ui.previewTarget = el.dataset.id; save(); switchTab('preview');

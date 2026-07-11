@@ -12,6 +12,11 @@ The workflow is the three tabs, in order:
 2. **Jobs & Tailoring** — for each job you apply to: paste the full posting, click **Analyze**, and you get a match score plus the exact keywords the posting uses that your resume is missing. Click a missing keyword to add it (only if it's true!), reword bullets to mirror the posting's language, untick irrelevant old jobs. The score updates as you go.
 3. **Preview & Export** — see the final document, run the ATS/quality audit, then export: **PDF** (via print dialog), **Word .doc**, **plain text** (for those "paste your resume" forms), or copy to clipboard. File names are auto-suggested like `Jane-Doe-Resume-Acme.pdf`.
 
+Each job also gets two bonus tools on the Jobs tab once you've analyzed the posting:
+
+- **Cover letter generator** — drafts a letter from your tailored resume and the posting's top keywords (your real accomplishments, the posting's language). Edit it, copy it, or download it as a Word doc.
+- **Interview prep sheet** — the keywords to say out loud, the questions to expect (including one per top keyword), and your quantified bullets to rehearse as short situation → action → result stories. One click copies the whole sheet to bring with you.
+
 ## Why this beats the paid services
 
 - **Same core tech.** The "AI resume optimization" those sites sell is mostly keyword extraction from the posting + coverage scoring + formatting rules. That's exactly what this does, transparently.
