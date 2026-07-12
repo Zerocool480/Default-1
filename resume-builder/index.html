@@ -496,7 +496,8 @@ function normalizeState(s) {
   s.jobs = (s.jobs || []).filter(j => j && typeof j === 'object').map(j => Object.assign({
     id: uid(), title: '', company: '', jd: '', url: '', status: 'saved', dateApplied: '',
     notes: '', coverLetter: '', createdAt: '', analysis: null
-  }, j, { tailored: Object.assign({ summary: '', skills: [], experience: [] }, j.tailored || {}) }));
+  }, j, { tailored: Object.assign({ summary: '', skills: [], experience: [] }, j.tailored || {}) }))
+    .map(j => ({ ...j, status: ['saved', 'applied', 'interview', 'offer', 'rejected'].includes(j.status) ? j.status : 'saved' }));
   const p = s.profile;
   p.contact = Object.assign({ name: '', email: '', phone: '', location: '', linkedin: '', website: '' }, p.contact || {});
   p.skills = Array.isArray(p.skills) ? p.skills : [];
@@ -534,13 +535,16 @@ const SKILL_DICT = [...new Set([
   'customer service','customer support','customer satisfaction','client relations','conflict resolution','point of sale','pos systems',
   'cash handling','cash register','upselling','cross-selling','merchandising','visual merchandising','inventory management','inventory control',
   'stocking','loss prevention','order fulfillment','returns processing','food safety','food service','servsafe','barista','hospitality',
+  'rf scanner','pallet jack','cherry picker','order picking','cycle counting','wms',
   'guest services','reservations','front of house','back of house','banquet','catering','housekeeping','concierge',
   // Healthcare
   'patient care','patient scheduling','patient intake','patient education','vital signs','phlebotomy','ekg','injections','medication administration',
   'electronic health records','electronic medical records','ehr','emr','epic','cerner','meditech','hipaa','hipaa compliance','medical terminology',
-  'medical billing','medical coding','icd-10','cpt coding','insurance verification','prior authorization','charting','triage','infection control',
+  'medical billing','medical coding','icd-10','cpt','cpt coding','insurance verification','prior authorization','charting','triage','infection control',
+  'revenue cycle','denials','appeals','icu','med/surg','telemetry','epic willow','pyxis','iv','immunizations',
   'cpr','bls','acls','first aid','care coordination','case management','home health','long-term care','assisted living','rehabilitation',
-  'nursing','registered nurse','licensed practical nurse','certified nursing assistant','medical assistant','dental assistant','pharmacy technician',
+  'nursing','registered nurse','rn','licensed practical nurse','certified nursing assistant','medical assistant','dental assistant','pharmacy technician','ptcb',
+  'care plans','care plan','referrals','discharge planning','patient assessment',
   'telehealth','patient advocacy','clinical documentation','specimen collection','sterilization','wound care',
   // Education / childcare
   'lesson planning','curriculum development','classroom management','iep','special education','early childhood education','child development',
@@ -550,11 +554,13 @@ const SKILL_DICT = [...new Set([
   'crm','salesforce','hubspot','pipeline management','quota','negotiation','closing','client retention','relationship building',
   'digital marketing','social media marketing','social media management','content creation','content marketing','copywriting','seo',
   'sem','email marketing','google analytics','google ads','facebook ads','brand management','market research','campaign management',
+  'demand generation','klaviyo','marketo','pardot','paid media','lifecycle marketing','attribution','conversion rate optimization',
   'influencer marketing','canva','adobe creative suite','photoshop','illustrator','indesign','video editing','graphic design',
   // Content design / UX / knowledge management / support operations
   'content design','content designer','content strategy','content management','content governance','content audit','content operations',
   'ux writing','ux writer','microcopy','ux design','user experience','user-centered','conversation design','conversational design',
   'chatbot','chat bot','voice assistant','voice bot','ivr','nlu','natural language understanding','prompt writing',
+  'voiceflow','dialogflow','llm','llms','prompt engineering','kcs','knowledge-centered service','voice & tone','technical writer',
   'knowledge management','knowledge base','knowledge architecture','help center','support center','help content','self-service',
   'deflection','contact rate','information architecture','taxonomy','metadata','tagging','content migration',
   'style guide','voice and tone','tone of voice','brand voice','plain language','terminology management','editorial guidelines',
@@ -571,6 +577,7 @@ const SKILL_DICT = [...new Set([
   'accounts payable','accounts receivable','bookkeeping','quickbooks','payroll','payroll processing','general ledger','reconciliation',
   'bank reconciliation','financial reporting','budgeting','forecasting','auditing','tax preparation','invoicing','billing','collections',
   'gaap','sap','oracle','netsuite','adp','workday','financial analysis','cost accounting','month-end close',
+  'fp&a','variance analysis','hyperion','anaplan','financial modeling','kpi reporting',
   'recruiting','talent acquisition','onboarding','employee relations','benefits administration','hris','performance management',
   'training and development','compliance','fmla','ada','eeo','hr policies','interviewing','background checks','open enrollment',
   // Project / operations / logistics
@@ -580,7 +587,8 @@ const SKILL_DICT = [...new Set([
   'supply chain','logistics','shipping','receiving','warehouse operations','forklift','osha','quality assurance','quality control',
   'dispatching','route planning','fleet management','erp','operations management','facilities management',
   // Tech / data
-  'sql','python','javascript','typescript','java','html','css','react','node.js','excel formulas','pivot tables','vlookup','macros',
+  'sql','python','javascript','typescript','java','html','css','react','node.js','excel','excel formulas','pivot tables','vlookup','macros',
+  'spring boot','kafka','storybook','jest','ci/cd','kubernetes','docker','graphql','rest api','microservices',
   'power bi','tableau','data analysis','data visualization','reporting','dashboards','a/b testing','api','git','aws','azure',
   'troubleshooting','technical support','help desk','it support','active directory','networking','cybersecurity','ticketing systems',
   'zendesk','servicenow','machine learning','automation',
@@ -595,14 +603,14 @@ const SKILL_DICT = [...new Set([
 ])];
 
 const STOPWORDS = new Set(('a,an,the,and,or,but,if,then,else,for,to,of,in,on,at,by,with,from,as,is,are,was,were,be,been,being,have,has,had,do,does,did,will,would,should,could,can,may,might,must,shall,not,no,yes,this,that,these,those,it,its,we,our,you,your,they,their,them,he,she,his,her,i,me,my,who,whom,which,what,when,where,why,how,all,any,both,each,few,more,most,other,some,such,than,too,very,just,also,about,above,after,again,against,below,between,into,through,during,before,under,over,out,off,up,down,own,same,so,per,via,etc,eg,ie,'
-+ 'job,work,role,position,candidate,candidates,applicant,applicants,apply,application,company,team,teams,employee,employees,employer,opportunity,opportunities,description,responsibilities,requirements,qualifications,preferred,required,must,ability,able,skills,skill,experience,experienced,years,year,including,include,includes,included,knowledge,strong,excellent,good,great,plus,bonus,benefits,salary,pay,hour,hourly,week,weekly,day,daily,month,monthly,full,part,time,shift,shifts,schedule,location,remote,hybrid,onsite,equal,diversity,disability,veteran,gender,race,religion,orientation,status,law,federal,state,local,click,link,please,visit,us,new,high,school,degree,bachelor,bachelors,master,masters,associate,associates,ged,perform,performs,performing,duties,duty,assigned,related,within,ensure,ensures,ensuring,provide,provides,providing,maintain,maintains,maintaining,assist,assists,assisting,support,supporting,help,helps,helping,other,others,various,general,using,use,used,uses,well,working,environment,looking,seeking,join,ideal,successful,demonstrated,proven,minimum,least,along,across,every,essential,functions,function,physical,lift,pounds,stand,walk,sit,reach,department,departments,manager,management,type,pm,am').split(','));
++ 'job,work,role,position,candidate,candidates,applicant,applicants,apply,application,company,team,teams,employee,employees,employer,opportunity,opportunities,description,responsibilities,requirements,qualifications,preferred,required,must,ability,able,skills,skill,experience,experienced,years,year,including,include,includes,included,knowledge,strong,excellent,good,great,plus,bonus,benefits,salary,pay,hour,hourly,week,weekly,day,daily,month,monthly,full,part,time,shift,shifts,schedule,location,remote,hybrid,onsite,equal,diversity,disability,veteran,gender,race,religion,orientation,status,law,federal,state,local,eeo,employer,click,link,please,visit,us,new,high,school,degree,bachelor,bachelors,master,masters,associate,associates,ged,perform,performs,performing,duties,duty,assigned,related,within,ensure,ensures,ensuring,provide,provides,providing,maintain,maintains,maintaining,assist,assists,assisting,support,supporting,help,helps,helping,other,others,various,general,using,use,used,uses,well,working,environment,looking,seeking,join,ideal,successful,demonstrated,proven,minimum,least,along,across,every,essential,functions,function,physical,lift,pounds,stand,walk,sit,reach,department,departments,manager,management,type,pm,am').split(','));
 
 function normText(s) {
   return ' ' + String(s || '').toLowerCase()
     .replace(/[‘’]/g, "'").replace(/[“”]/g, '"')
     .replace(/'(ll|re|ve|d|m|t|s)\b/g, '')
     .replace(/[–—]/g, '-')
-    .replace(/[^a-z0-9+#./' -]/g, ' ')
+    .replace(/[^a-z0-9+#&./' -]/g, ' ')
     .replace(/\s+/g, ' ') + ' ';
 }
 
@@ -634,19 +642,23 @@ const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // like "ia") only ever match exactly.
 function textHasTerm(normTxt, term) {
   const t = term.toLowerCase().trim();
-  const re = new RegExp('(^|[^a-z0-9])' + escRe(t) + '(s|es|ing|ed)?([^a-z0-9]|$)', 'i');
+  // Exact match with plural-s tolerance only — broader inflections (es/ing/ed)
+  // are handled by the symmetric stem pass below, which verifies both sides,
+  // so 'unit' no longer gets credit from 'United' nor 'canva' from 'canvas'.
+  const re = new RegExp('(^|[^a-z0-9])' + escRe(t) + 's?([^a-z0-9]|$)', 'i');
   if (re.test(normTxt)) return true;
   const words = t.split(/\s+/);
   if (!words.some(w => w.length >= 4)) return false;
+  // No early return when stemmed === term: the RESUME side still changes under
+  // stemming ('policies' -> 'policy'), so the stem pass is never redundant.
   const stemmed = words.map(stemWord).join(' ');
-  if (stemmed === t) return false;
   return new RegExp('(^|[^a-z0-9])' + escRe(stemmed) + '([^a-z0-9]|$)', 'i').test(stemText(normTxt));
 }
 
 // Identify the "requirements / must have / qualifications" portion of a posting,
 // so keywords listed there can be weighted and flagged as required.
 function requiredSectionText(jd) {
-  const REQ_HEAD = /^(minimum |basic )?(requirements?|qualifications?|must[- ]haves?|what (you|you'll|you’ll) (need|bring)|who you are|skills (and|&) experience|what we('|’)re looking for)\b/i;
+  const REQ_HEAD = /^(minimum |basic )?(requirements?|qualifications?|must[- ]haves?|what (you|you'll|you’ll) (need|bring)|who you are|about you|skills (and|&) experience|what we('|’)re looking for)\b/i;
   const OTHER_HEAD = /^(responsibilities|duties|what (you|you'll|you’ll) (do|be doing)|about (us|the role|the company)|benefits|perks|compensation|preferred|nice to have|bonus|why (join|work)|our (team|mission)|schedule|education)\b/i;
   const src = String(jd || '');
   const lines = src.split('\n');
@@ -682,7 +694,8 @@ function extractKeywords(jd) {
   const reqNorm = normText(requiredSectionText(jd));
   const found = new Map(); // term -> weight
 
-  // 1) Dictionary phrase matching (highest signal)
+  // 1) Dictionary phrase matching (highest signal). Exact/plural first;
+  // a stem-level hit (schedule <-> scheduling) still counts at base weight.
   for (const term of SKILL_DICT) {
     const escT = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const re = new RegExp('(^|[^a-z0-9])' + escT + '(s|es)?([^a-z0-9]|$)', 'gi');
@@ -691,6 +704,8 @@ function extractKeywords(jd) {
       const freq = matches.length;
       const w = (2 + Math.min(freq, 4)) * (term.includes(' ') ? 1.35 : 1);
       found.set(term, (found.get(term) || 0) + w);
+    } else if (term.length >= 6 && textHasTerm(norm, term)) {
+      found.set(term, (found.get(term) || 0) + 3 * (term.includes(' ') ? 1.35 : 1));
     }
   }
 
@@ -703,7 +718,7 @@ function extractKeywords(jd) {
     .split(/[.!?;:\n•·|()]+/);
   const uni = new Map(), bi = new Map();
   for (const seg of segments) {
-    const ws = seg.replace(/[^a-z0-9+#/ -]/g, ' ').split(/\s+/).filter(Boolean);
+    const ws = seg.replace(/[^a-z0-9+#&/ -]/g, ' ').split(/\s+/).filter(Boolean);
     for (let i = 0; i < ws.length; i++) {
       if (isStop(ws[i])) continue;
       uni.set(ws[i], (uni.get(ws[i]) || 0) + 1);
@@ -721,16 +736,18 @@ function extractKeywords(jd) {
       return tw.every(w => kw.includes(w)) || kw.every(w => tw.includes(w));
     });
   };
-  for (const [bg, f] of bi) if (f >= 2 && !covered(bg)) found.set(bg, (found.get(bg) || 0) + f * 1.5);
-  for (const [w, f] of uni) if (f >= 3 && w.length > 3 && !covered(w)) found.set(w, (found.get(w) || 0) + f * 0.9);
+  for (const [bg, f] of bi) if (f >= 2 && !covered(bg)) found.set(bg, (found.get(bg) || 0) + Math.min(f, 4) * 1.5);
+  for (const [w, f] of uni) if (f >= 3 && w.length > 3 && !covered(w)) found.set(w, (found.get(w) || 0) + Math.min(f, 5) * 0.9);
 
+  const titleLine = normText((String(jd || '').split('\n').find(l => l.trim() && l.trim().length < 90) || '').slice(0, 120));
   return [...found.entries()]
     .map(([term, weight]) => {
       const req = reqNorm.trim().length > 20 && textHasTerm(reqNorm, term);
-      return { term, weight: Math.round(weight * (req ? 1.6 : 1) * 10) / 10, req };
+      const inTitle = titleLine.trim().length > 3 && textHasTerm(titleLine, term);
+      return { term, weight: Math.round(weight * (req ? 1.6 : 1) * (inTitle ? 1.25 : 1) * 10) / 10, req };
     })
     .sort((a, b) => b.weight - a.weight)
-    .slice(0, 28);
+    .slice(0, 40);
 }
 
 // Build the full searchable text of a resume version.
@@ -766,7 +783,7 @@ function computeGrade(version) {
   // 2. Title alignment — does the resume speak the job title's language?
   if (job?.title) {
     const TITLE_STOP = new Set(['a', 'an', 'the', 'of', 'and', 'or', 'for', 'to', 'in', 'with', 'at', 'on']);
-    const tw = normText(job.title).trim().split(' ').filter(w => w.length > 1 && !TITLE_STOP.has(w));
+    const tw = normText(job.title).trim().split(' ').filter(w => w.length > 1 && !TITLE_STOP.has(w) && !/\d/.test(w));
     if (tw.length) {
       const hay = normText(r.summary + ' ' + r.experience.map(e => e.title).join(' '));
       const pct = Math.round(tw.filter(w => textHasTerm(hay, w)).length / tw.length * 100);
@@ -1000,7 +1017,7 @@ function renderJobList() {
       <div class="jt">${esc(j.title) || 'Untitled role'}</div>
       <div class="jc">${esc(j.company) || '—'}</div>
       <div class="meta">
-        <span class="status-badge status-${j.status}">${j.status}</span>
+        <span class="status-badge status-${esc(j.status)}">${esc(j.status)}</span>
         ${g ? `<span class="mini-score" style="color:${ringColor(g.pct)}">${g.letter} · ${g.pct}%</span>` : ''}
       </div>
     </div>`;
@@ -1027,8 +1044,8 @@ function scoreRingHTML(score) {
 const KNOCKOUT_PATTERNS = [
   { label: 'Work authorization / visa', re: /(work authorization|authorized to work|eligible to work|right to work|visa sponsorship|no sponsorship|sponsorship is not available|us citizen(ship)?|green card|permanent resident)/i },
   { label: 'Security clearance', re: /(security clearance|ts\/sci|top secret|secret clearance)/i },
-  { label: 'Location / onsite', re: /(on-?site required|in[- ]office \d|days? (per|a) week in|must (be located|reside|live)|relocat(e|ion)|local candidates only|commutable)/i },
-  { label: 'Minimum years of experience', re: /\b\d+\+?\s*(?:years?|yrs?)[^.\n]{0,50}(?:experience|exp)\b/i },
+  { label: 'Location / onsite', re: /(on-?site required|in[- ]office \d|days?\s*(?:\/|per|a)\s*week (in|on-?site|in[- ]office)|must (be located|reside|live)|must relocate|willing(ness)? to relocate|relocation (is )?required|local candidates only|commutable)/i },
+  { label: 'Minimum years of experience', re: /\b\d+(?:\s*(?:-|–|to)\s*\d+)?\+?\s*(?:years?|yrs?)(?:['’]|\b)[^.\n]{0,60}?(?:experience|exp)\b|minimum of \d+ years?/i },
   { label: 'Degree requirement', re: /(bachelor'?s?|master'?s?|ph\.?d|b\.s\.|m\.s\.)[^.\n]{0,40}(required|must)|(required|must)[^.\n]{0,40}(bachelor|master|degree)/i },
   { label: 'License / certification required', re: /(license|licensure|certification|certified)[^.\n]{0,30}(required|must)|(required|must)[^.\n]{0,40}(license|certification)|driver'?s license|\bcdl\b/i },
   { label: 'Background / drug screening', re: /(background check|drug (screen|test))/i },
@@ -1038,11 +1055,38 @@ const KNOCKOUT_PATTERNS = [
     tip: 'Give a researched range, never a single number — and at phone screens, ask for their budgeted range first.' },
   { label: 'Schedule / shift / travel', re: /(night shift|weekends? required|overtime required|travel (up to|required|\d+%)|rotating shifts)/i }
 ];
+const SOFTENED = /\bnot required\b|\bpreferred but not\b|\bor equivalent experience\b|\bnice to have\b|\ba plus\b/i;
+// Relaxed patterns that count as knockouts when they appear INSIDE the
+// posting's Requirements/Qualifications section (the section implies "required").
+const REQ_SECTION_KNOCKOUTS = [
+  { label: 'Degree requirement', re: /\b(adn|bsn|msn|associate|bachelor|master)(['’]s)?(\s+degree)?\b|\bdegree\b|\bdiploma\b|graduate of an accredited/i },
+  { label: 'License / certification required', re: /\b(license[d]?|licensure|certification|certified|registered nurse|\brn\b|cdl|clearance)\b/i },
+  { label: 'Minimum years of experience', re: /\b\d+(?:\s*(?:-|–|to)\s*\d+)?\+?\s*(?:years?|yrs?)\b/i }
+];
 function detectKnockouts(jd) {
+  const src = String(jd || '');
   const out = [];
+  const push = (label, m, hay, tip) => {
+    const around = hay.slice(Math.max(0, m.index - 40), m.index + m[0].length + 60);
+    if (SOFTENED.test(around)) return;
+    if (out.some(o => o.label === label)) return;
+    out.push({ label, excerpt: m[0].trim().slice(0, 110), tip: tip || '' });
+  };
   for (const k of KNOCKOUT_PATTERNS) {
-    const m = String(jd || '').match(k.re);
-    if (m) out.push({ label: k.label, excerpt: m[0].trim().slice(0, 110), tip: k.tip || '' });
+    const m = src.match(k.re);
+    if (m) push(k.label, m, src, k.tip);
+  }
+  const reqTxt = requiredSectionText(jd);
+  if (reqTxt.trim().length > 20) {
+    for (const k of REQ_SECTION_KNOCKOUTS) {
+      const m = reqTxt.match(k.re);
+      if (m) push(k.label, m, reqTxt);
+    }
+  }
+  // Implicit onsite: a "City, ST" location up top with no remote/hybrid language
+  if (!out.some(o => o.label === 'Location / onsite') && !/\b(remote|work[- ]from[- ]home|hybrid|anywhere|distributed)\b/i.test(src)) {
+    const m = src.slice(0, 400).match(/\b[A-Z][A-Za-z.]+(?: [A-Z][A-Za-z.]+)*,\s*[A-Z]{2}\b/);
+    if (m) out.push({ label: 'Location / onsite', excerpt: m[0], tip: 'No remote/hybrid language found — this reads as onsite. Confirm the commute works before investing time.' });
   }
   return out;
 }
@@ -1062,6 +1106,7 @@ function analysisHTML(job) {
   const g = computeGrade(job.id);
   const res = g.kwRes;
   if (!res) return '';
+  const staleNote = job.analysis.stale ? `<div class="callout" style="background:var(--amber-soft); border:1px solid var(--amber); border-radius:8px; padding:8px 12px; font-size:13px; margin-bottom:10px;">The posting text changed since this analysis — click <strong>Analyze</strong> again to refresh the grade.</div>` : '';
   const kwChip = (k, cls, extra = '') =>
     `<span class="chip ${cls}" ${extra} title="${k.req ? 'Listed under the posting\'s requirements' : ''}">${cls === 'missing' ? '+ ' : ''}${k.req ? '<span class="reqmark">★</span> ' : ''}${esc(k.term)}</span>`;
   const verdict = g.pct >= 80
@@ -1069,7 +1114,7 @@ function analysisHTML(job) {
     : g.pct >= 55
       ? '<strong>Getting there.</strong> Fix the lowest bars below — start with any ★ required keywords still missing.'
       : '<strong>Needs tailoring.</strong> A recruiter searching these terms won’t surface this resume yet.';
-  return knockoutHTML(job) + `
+  return knockoutHTML(job) + staleNote + `
   <div class="card">
     <h3>Grade against this posting</h3>
     <div class="score-row">
@@ -1520,7 +1565,7 @@ function renderPreview() {
     if (job?.analysis?.keywords?.length) {
       const g = computeGrade(v);
       scoreCard.innerHTML = `<h3>Grade</h3>
-        <div class="score-row">${scoreRingHTML(g.pct)}<div class="score-desc"><strong>${g.letter} — ${esc(job.title||'')} @ ${esc(job.company||'')}</strong><br>${g.kwRes ? `${g.kwRes.found.length} of ${g.kwRes.found.length + g.kwRes.missing.length} posting keywords covered.` : ''}</div></div>
+        <div class="score-row">${scoreRingHTML(g.pct)}<div class="score-desc"><strong>${g.letter} — ${esc(job.title||'')} @ ${esc(job.company||'')}</strong><br>${g.kwRes ? `${g.kwRes.found.length + g.kwRes.partial.length} of ${g.kwRes.found.length + g.kwRes.partial.length + g.kwRes.missing.length} posting keywords covered${g.kwRes.partial.length ? ` (${g.kwRes.partial.length} via synonym)` : ''}.` : ''}</div></div>
         ${gradeBarsHTML(g)}`;
     } else {
       scoreCard.innerHTML = `<h3>Grade</h3><p class="hint">Analyze the posting on the Jobs tab to see a grade here.</p>`;
@@ -1595,13 +1640,15 @@ function makeZip(files) {
   for (const a of all) { out.set(a, pos); pos += a.length; }
   return out;
 }
-const xesc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const xesc = s => String(s ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 // para: { runs:[{t,b,i,size,caps,tab}], size (half-points), spaceBefore/After (twips), border, indent, tabRight }
 function docxParagraph(p) {
+  // CT_PPrBase is an xsd:sequence — child order matters to strict parsers:
+  // pBdr, then tabs, then spacing, then ind.
   const props = [];
-  if (p.spaceBefore || p.spaceAfter) props.push(`<w:spacing w:before="${p.spaceBefore || 0}" w:after="${p.spaceAfter || 0}"/>`);
   if (p.border) props.push('<w:pBdr><w:bottom w:val="single" w:sz="8" w:space="2" w:color="333333"/></w:pBdr>');
   if (p.tabRight) props.push('<w:tabs><w:tab w:val="right" w:pos="9360"/></w:tabs>');
+  if (p.spaceBefore || p.spaceAfter) props.push(`<w:spacing w:before="${p.spaceBefore || 0}" w:after="${p.spaceAfter || 0}"/>`);
   if (p.indent) props.push(`<w:ind w:left="${p.indent}" w:hanging="180"/>`);
   const runs = (p.runs || []).map(r => {
     const rp = [];
@@ -1635,7 +1682,7 @@ function resumeDocxParas(version) {
   const sec = t => P.push({ runs: [{ t, b: true, caps: true }], size: 22, border: true, spaceBefore: 220, spaceAfter: 80 });
   P.push({ runs: [{ t: c.name || 'Your Name', b: true, size: 38 }], spaceAfter: 40 });
   P.push({ runs: [{ t: [c.location, c.phone, c.email, c.linkedin, c.website].filter(Boolean).join(' | ') }], size: 20, spaceAfter: 120 });
-  if (r.summary?.trim()) { sec('Professional Summary'); P.push({ runs: [{ t: r.summary.trim() }], spaceAfter: 80 }); }
+  if (r.summary?.trim()) { sec('Professional Summary'); for (const line of r.summary.trim().split(/\n+/)) P.push({ runs: [{ t: line.trim() }], spaceAfter: 80 }); }
   if (r.skills.length) { sec('Skills'); P.push({ runs: [{ t: r.skills.join(', ') }], spaceAfter: 80 }); }
   if (r.experience.length) {
     sec('Professional Experience');
@@ -1755,7 +1802,7 @@ async function runSearch() {
       return d.results || [];
     } catch (e) { errors.push(`${s.name}: ${e.message}`); return []; }
   }));
-  searchResults = settled.flat().map(r => ({ ...r, match: quickGrade(r.description) }));
+  searchResults = settled.flat().map(r => ({ ...r, match: quickGrade((r.title ? r.title + '\n' : '') + (r.description || '')) }));
   searchResults.sort((a, b) => (b.match ?? -1) - (a.match ?? -1));
   renderSearchResults(errors);
 }
@@ -1787,7 +1834,7 @@ function createJobFrom({ title, company, jd, url }) {
     status: 'saved', dateApplied: '', notes: '', coverLetter: '',
     createdAt: new Date().toISOString(), tailored: makeTailored(), analysis: null
   };
-  if ((jd || '').trim().length >= 60) job.analysis = { keywords: extractKeywords(jd), at: new Date().toISOString() };
+  if ((jd || '').trim().length >= 60) job.analysis = { keywords: extractKeywords((job.title ? job.title + '\n' : '') + jd), at: new Date().toISOString() };
   state.jobs.unshift(job);
   state.ui.selectedJob = job.id;
   save();
@@ -1853,6 +1900,7 @@ document.addEventListener('input', e => {
     const job = state.jobs.find(j => j.id === t.dataset.job);
     if (job) {
       job[t.dataset.f] = t.value;
+      if (t.dataset.f === 'jd' && job.analysis) job.analysis.stale = true;
       if (t.dataset.f === 'title' || t.dataset.f === 'company' || t.dataset.f === 'status') renderJobList();
       if (t.dataset.f === 'status' && t.value === 'applied' && !job.dateApplied) job.dateApplied = new Date().toISOString().slice(0, 10);
     }
@@ -1986,7 +2034,7 @@ document.addEventListener('click', e => {
     const job = state.jobs.find(j => j.id === el.dataset.id);
     if (!job) return;
     if ((job.jd || '').trim().length < 60) { toast('Paste the full job posting first — the more text, the better the analysis.'); return; }
-    const kws = extractKeywords(job.jd);
+    const kws = extractKeywords((job.title ? job.title + '\n' : '') + job.jd);
     if (!kws.length) { job.analysis = null; save(); renderJobs(); toast('⚠ No keywords found — paste the complete posting text and try again'); return; }
     job.analysis = { keywords: kws, at: new Date().toISOString() };
     save(); renderJobs();
@@ -2063,6 +2111,12 @@ document.addEventListener('click', e => {
     toast('Backup downloaded — keep it somewhere safe');
   }
   else if (a === 'import-json') document.getElementById('import-file').click();
+});
+
+// Native Ctrl/Cmd+P prints the resume too, not a blank page.
+addEventListener('beforeprint', () => {
+  const pa = document.getElementById('print-area');
+  if (!pa.innerHTML.trim()) pa.innerHTML = resumeHTML(state.ui.previewTarget);
 });
 
 /* ================================================================

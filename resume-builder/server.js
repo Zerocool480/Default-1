@@ -45,7 +45,10 @@ function stripHtml(s) {
 }
 
 async function fetchJson(url, opts = {}) {
-  const r = await fetch(url, Object.assign({ headers: { 'User-Agent': 'ResumeForge/1.0 (personal job search tool)' } }, opts));
+  const r = await fetch(url, Object.assign({
+    headers: { 'User-Agent': 'ResumeForge/1.0 (personal job search tool)' },
+    signal: AbortSignal.timeout(15000)
+  }, opts));
   if (!r.ok) throw new Error(`upstream ${r.status}`);
   return r.json();
 }
@@ -94,7 +97,8 @@ async function searchSource(p) {
       if (!key) throw new Error('Jooble needs an API key');
       const r = await fetch(`https://jooble.org/api/${enc(key)}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keywords: q, location: loc })
+        body: JSON.stringify({ keywords: q, location: loc }),
+        signal: AbortSignal.timeout(15000)
       });
       if (!r.ok) throw new Error(`upstream ${r.status}`);
       const d = await r.json();
@@ -154,15 +158,23 @@ async function searchSource(p) {
 
 function readBody(req, limit = 1024 * 1024) {
   return new Promise((resolve, reject) => {
-    let buf = '';
-    req.on('data', c => { buf += c; if (buf.length > limit) { reject(new Error('too large')); req.destroy(); } });
-    req.on('end', () => resolve(buf));
+    const chunks = [];
+    let size = 0;
+    req.on('data', c => {
+      size += c.length;
+      if (size > limit) { reject(new Error('too large')); req.destroy(); return; }
+      chunks.push(c);
+    });
+    // Concatenate before decoding so multi-byte UTF-8 split across chunks survives.
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     req.on('error', reject);
   });
 }
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  let url;
+  try { url = new URL(req.url, `http://${HOST}:${PORT}`); }
+  catch (e) { return send(res, 400, { error: 'bad request' }); }
 
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
 
