@@ -88,7 +88,7 @@ async function searchSource(p) {
       const d = await fetchJson(`https://api.adzuna.com/v1/api/jobs/${country}/search/1?app_id=${enc(id)}&app_key=${enc(key)}&results_per_page=20&what=${enc(q)}&where=${enc(loc)}&content-type=application/json`);
       return (d.results || []).map(r => ({
         title: r.title, company: r.company?.display_name || '', location: r.location?.display_name || '',
-        url: r.redirect_url, description: stripHtml(r.description), source: 'Adzuna', posted: r.created
+        url: r.redirect_url, description: stripHtml(r.description).slice(0, 8000), source: 'Adzuna', posted: r.created
       }));
     }
 
@@ -119,7 +119,7 @@ async function searchSource(p) {
         return {
           title: j.PositionTitle, company: j.OrganizationName || '', location: (j.PositionLocationDisplay || ''),
           url: j.PositionURI, source: 'USAJobs', posted: j.PublicationStartDate,
-          description: stripHtml([j.UserArea?.Details?.JobSummary, (j.QualificationSummary || '')].filter(Boolean).join(' '))
+          description: stripHtml([j.UserArea?.Details?.JobSummary, (j.QualificationSummary || '')].filter(Boolean).join(' ')).slice(0, 8000)
         };
       });
     }
@@ -181,11 +181,17 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/api/clip' && req.method === 'POST') {
     try {
       const body = JSON.parse(await readBody(req));
+      const cut = (v, max) => {
+        let x = String(v || '').slice(0, max);
+        // don't leave half an emoji behind after truncation
+        const c = x.charCodeAt(x.length - 1);
+        return (c >= 0xD800 && c <= 0xDBFF) ? x.slice(0, -1) : x;
+      };
       clips.push({
         id: Math.random().toString(36).slice(2),
-        title: String(body.title || '').slice(0, 300),
-        url: String(body.url || '').slice(0, 2000),
-        text: String(body.text || '').slice(0, 40000),
+        title: cut(body.title, 300),
+        url: cut(body.url, 2000),
+        text: cut(body.text, 40000),
         at: Date.now()
       });
       if (clips.length > 50) clips = clips.slice(-50);

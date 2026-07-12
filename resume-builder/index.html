@@ -452,11 +452,23 @@ function load() {
 }
 
 let saveTimer = null;
+let lastWritten = null;
 function flushNow() {
   clearTimeout(saveTimer);
   saveTimer = null;
   try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    // If another tab wrote while our save was pending, adopt any jobs it
+    // created (e.g. clipped postings) before we overwrite the blob.
+    const cur = localStorage.getItem(STORE_KEY);
+    if (cur && cur !== lastWritten) {
+      try {
+        const ext = JSON.parse(cur);
+        const ids = new Set(state.jobs.map(j => j.id));
+        for (const j of (ext.jobs || [])) if (j && j.id && !ids.has(j.id)) state.jobs.push(j);
+      } catch (e2) { /* unreadable external write — ours wins */ }
+    }
+    lastWritten = JSON.stringify(state);
+    localStorage.setItem(STORE_KEY, lastWritten);
     hideStorageBanner();
   } catch (e) { showStorageBanner(); }
 }
@@ -496,13 +508,28 @@ function normalizeState(s) {
   s.jobs = (s.jobs || []).filter(j => j && typeof j === 'object').map(j => Object.assign({
     id: uid(), title: '', company: '', jd: '', url: '', status: 'saved', dateApplied: '',
     notes: '', coverLetter: '', createdAt: '', analysis: null
-  }, j, { tailored: Object.assign({ summary: '', skills: [], experience: [] }, j.tailored || {}) }))
+  }, j, {
+    tailored: (t => ({
+      summary: typeof t.summary === 'string' ? t.summary : '',
+      skills: Array.isArray(t.skills) ? t.skills.filter(x => typeof x === 'string') : [],
+      experience: (Array.isArray(t.experience) ? t.experience : []).filter(te => te && typeof te === 'object').map(te => ({
+        expId: String(te.expId || ''), include: te.include !== false,
+        bullets: Array.isArray(te.bullets) ? te.bullets : [],
+        ...(te.snapshot ? { snapshot: te.snapshot } : {})
+      }))
+    }))(j.tailored || {})
+  }))
     .map(j => ({ ...j, status: ['saved', 'applied', 'interview', 'offer', 'rejected'].includes(j.status) ? j.status : 'saved' }));
   const p = s.profile;
   p.contact = Object.assign({ name: '', email: '', phone: '', location: '', linkedin: '', website: '' }, p.contact || {});
-  p.skills = Array.isArray(p.skills) ? p.skills : [];
-  p.experience = Array.isArray(p.experience) ? p.experience : [];
-  p.education = Array.isArray(p.education) ? p.education : [];
+  p.summary = typeof p.summary === 'string' ? p.summary : '';
+  p.certifications = typeof p.certifications === 'string' ? p.certifications : '';
+  p.skills = (Array.isArray(p.skills) ? p.skills : []).filter(x => typeof x === 'string');
+  p.experience = (Array.isArray(p.experience) ? p.experience : []).filter(e => e && typeof e === 'object').map(e => Object.assign(
+    { id: uid(), title: '', company: '', location: '', start: '', end: '', current: false }, e,
+    { bullets: Array.isArray(e.bullets) ? e.bullets : [] }));
+  p.education = (Array.isArray(p.education) ? p.education : []).filter(e => e && typeof e === 'object').map(e => Object.assign(
+    { id: uid(), degree: '', school: '', location: '', gradDate: '' }, e));
   return s;
 }
 
@@ -637,17 +664,25 @@ function stemText(s) {
 }
 const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// Terms whose pluralized form spells an unrelated word — no s-tolerance.
+const S_TOLERANCE_EXCEPTIONS = new Set(['canva', 'sketch', 'concur', 'notion']);
+
 // Does normalized text contain the term? Exact/suffix-tolerant first, then a
 // symmetric stemmed comparison. Terms whose words are all very short (acronyms
 // like "ia") only ever match exactly.
 function textHasTerm(normTxt, term) {
   const t = term.toLowerCase().trim();
-  // Exact match with plural-s tolerance only — broader inflections (es/ing/ed)
-  // are handled by the symmetric stem pass below, which verifies both sides,
-  // so 'unit' no longer gets credit from 'United' nor 'canva' from 'canvas'.
-  const re = new RegExp('(^|[^a-z0-9])' + escRe(t) + 's?([^a-z0-9]|$)', 'i');
+  // Exact match with plural-s tolerance only — broader inflections are handled
+  // by the symmetric stem pass below. Terms whose +s spells a DIFFERENT word
+  // (canva→canvas) get no tolerance at all.
+  const sTol = S_TOLERANCE_EXCEPTIONS.has(t) ? '' : 's?';
+  const re = new RegExp('(^|[^a-z0-9])' + escRe(t) + sTol + '([^a-z0-9]|$)', 'i');
   if (re.test(normTxt)) return true;
   const words = t.split(/\s+/);
+  // Short single words ('unit', 'care') are too collision-prone for stemming —
+  // stemWord('united') is 'unit'. They must match exactly (above) or not at all.
+  // Exception-set terms (canva) never stem-match either: stemText('canvas') is 'canva'.
+  if (words.length === 1 && (words[0].length < 5 || S_TOLERANCE_EXCEPTIONS.has(t))) return false;
   if (!words.some(w => w.length >= 4)) return false;
   // No early return when stemmed === term: the RESUME side still changes under
   // stemming ('policies' -> 'policy'), so the stem pass is never redundant.
@@ -670,8 +705,20 @@ function requiredSectionText(jd) {
   for (const raw of lines) {
     const line = raw.trim().replace(/^[-•*·]+\s*/, '');
     if (line && looksLikeHeader(line)) {
-      if (REQ_HEAD.test(line)) { inReq = true; continue; }
-      if (OTHER_HEAD.test(line)) { inReq = false; continue; }
+      const isRealHeader = re => {
+        if (!re.test(line)) return false;
+        const rem = line.replace(re, '').replace(/^[:\s-]*/, '');
+        // "Requirements Analyst" is a job title, not a header — a short
+        // remainder with no colon means the phrase is part of a name.
+        return rem === '' || /:$/.test(line.split(rem)[0] || '') || rem.length > 15;
+      };
+      if (isRealHeader(REQ_HEAD)) {
+        inReq = true;
+        const rem = line.replace(REQ_HEAD, '').replace(/^[:\s-]*/, '');
+        if (rem) out.push(rem);
+        continue;
+      }
+      if (isRealHeader(OTHER_HEAD)) { inReq = false; continue; }
     }
     if (inReq && line) out.push(line);
   }
@@ -687,9 +734,12 @@ function requiredSectionText(jd) {
   return '';
 }
 
-// Extract ranked keywords from a job description.
-function extractKeywords(jd) {
-  const norm = normText(jd);
+// Extract ranked keywords from a job description (title passed separately so
+// a title like "Requirements Analyst" can't be mistaken for a section header).
+function extractKeywords(jd, title = '') {
+  jd = String(jd || '').slice(0, 30000); // bound analysis cost on huge pastes
+  const full = (title ? title + '\n' : '') + jd;
+  const norm = normText(full);
   if (norm.trim().length < 30) return [];
   const reqNorm = normText(requiredSectionText(jd));
   const found = new Map(); // term -> weight
@@ -698,14 +748,16 @@ function extractKeywords(jd) {
   // a stem-level hit (schedule <-> scheduling) still counts at base weight.
   for (const term of SKILL_DICT) {
     const escT = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp('(^|[^a-z0-9])' + escT + '(s|es)?([^a-z0-9]|$)', 'gi');
+    const re = new RegExp('(^|[^a-z0-9])' + escT + (S_TOLERANCE_EXCEPTIONS.has(term) ? '' : '(s|es)?') + '([^a-z0-9]|$)', 'gi');
     const matches = norm.match(re);
     if (matches) {
       const freq = matches.length;
       const w = (2 + Math.min(freq, 4)) * (term.includes(' ') ? 1.35 : 1);
       found.set(term, (found.get(term) || 0) + w);
-    } else if (term.length >= 6 && textHasTerm(norm, term)) {
-      found.set(term, (found.get(term) || 0) + 3 * (term.includes(' ') ? 1.35 : 1));
+    } else if (term.includes(' ') && term.length >= 6 && textHasTerm(norm, term)) {
+      // Stem fallback for PHRASES only — single-word stems collide too easily
+      // ('stocking' would match benefits boilerplate about 'stock options').
+      found.set(term, (found.get(term) || 0) + 3 * 1.35);
     }
   }
 
@@ -713,7 +765,7 @@ function extractKeywords(jd) {
   // Tokenize per sentence/clause segment so bigrams are only ever pairs of
   // words that were truly adjacent in the posting (no phantom phrases).
   const isStop = w => w.length <= 2 || STOPWORDS.has(w) || /^\d+$/.test(w);
-  const segments = String(jd || '').toLowerCase()
+  const segments = full.toLowerCase()
     .replace(/[‘’]/g, "'").replace(/'(ll|re|ve|d|m|t|s)\b/g, '')
     .split(/[.!?;:\n•·|()]+/);
   const uni = new Map(), bi = new Map();
@@ -739,15 +791,18 @@ function extractKeywords(jd) {
   for (const [bg, f] of bi) if (f >= 2 && !covered(bg)) found.set(bg, (found.get(bg) || 0) + Math.min(f, 4) * 1.5);
   for (const [w, f] of uni) if (f >= 3 && w.length > 3 && !covered(w)) found.set(w, (found.get(w) || 0) + Math.min(f, 5) * 0.9);
 
-  const titleLine = normText((String(jd || '').split('\n').find(l => l.trim() && l.trim().length < 90) || '').slice(0, 120));
-  return [...found.entries()]
+  const titleLine = normText((title || String(jd).split('\n').find(l => l.trim() && l.trim().length < 90) || '').slice(0, 120));
+  const ranked = [...found.entries()]
     .map(([term, weight]) => {
       const req = reqNorm.trim().length > 20 && textHasTerm(reqNorm, term);
       const inTitle = titleLine.trim().length > 3 && textHasTerm(titleLine, term);
       return { term, weight: Math.round(weight * (req ? 1.6 : 1) * (inTitle ? 1.25 : 1) * 10) / 10, req };
     })
-    .sort((a, b) => b.weight - a.weight)
-    .slice(0, 40);
+    .sort((a, b) => b.weight - a.weight);
+  // Required terms are never evicted by the cap; fill the rest by weight.
+  const reqs = ranked.filter(k => k.req), rest = ranked.filter(k => !k.req);
+  return [...reqs, ...rest].slice(0, 40).sort((a, b) => b.weight - a.weight)
+    .sort((a, b) => b.weight - a.weight);
 }
 
 // Build the full searchable text of a resume version.
@@ -1066,27 +1121,37 @@ const REQ_SECTION_KNOCKOUTS = [
 function detectKnockouts(jd) {
   const src = String(jd || '');
   const out = [];
-  const push = (label, m, hay, tip) => {
-    const around = hay.slice(Math.max(0, m.index - 40), m.index + m[0].length + 60);
-    if (SOFTENED.test(around)) return;
-    if (out.some(o => o.label === label)) return;
-    out.push({ label, excerpt: m[0].trim().slice(0, 110), tip: tip || '' });
+  // The softened check only looks at the SAME sentence/line as the match —
+  // "License required. Bilingual a plus." must not suppress the license.
+  const sameSentence = (hay, start, end) => {
+    const b = Math.max(hay.lastIndexOf('.', start), hay.lastIndexOf('\n', start), hay.lastIndexOf('•', start), hay.lastIndexOf(';', start));
+    const rest = hay.slice(end);
+    const a = rest.search(/[.\n•;]/);
+    return hay.slice(b + 1, a === -1 ? hay.length : end + a);
   };
-  for (const k of KNOCKOUT_PATTERNS) {
-    const m = src.match(k.re);
-    if (m) push(k.label, m, src, k.tip);
-  }
+  const push = (label, hay, re, tip) => {
+    if (out.some(o => o.label === label)) return;
+    // Try every occurrence — a softened first mention must not hide a hard later one.
+    for (const m of hay.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'))) {
+      if (SOFTENED.test(sameSentence(hay, m.index, m.index + m[0].length))) continue;
+      out.push({ label, excerpt: m[0].trim().slice(0, 110), tip: tip || '' });
+      return;
+    }
+  };
+  for (const k of KNOCKOUT_PATTERNS) push(k.label, src, k.re, k.tip);
   const reqTxt = requiredSectionText(jd);
   if (reqTxt.trim().length > 20) {
-    for (const k of REQ_SECTION_KNOCKOUTS) {
-      const m = reqTxt.match(k.re);
-      if (m) push(k.label, m, reqTxt);
-    }
+    for (const k of REQ_SECTION_KNOCKOUTS) push(k.label, reqTxt, k.re);
   }
   // Implicit onsite: a "City, ST" location up top with no remote/hybrid language
-  if (!out.some(o => o.label === 'Location / onsite') && !/\b(remote|work[- ]from[- ]home|hybrid|anywhere|distributed)\b/i.test(src)) {
-    const m = src.slice(0, 400).match(/\b[A-Z][A-Za-z.]+(?: [A-Z][A-Za-z.]+)*,\s*[A-Z]{2}\b/);
-    if (m) out.push({ label: 'Location / onsite', excerpt: m[0], tip: 'No remote/hybrid language found — this reads as onsite. Confirm the commute works before investing time.' });
+  if (!out.some(o => o.label === 'Location / onsite') && !/\b(remote|work[- ](?:from|at)[- ]home|wfh|hybrid|anywhere|distributed|telework\w*|telecommut\w*|virtual position)\b/i.test(src)) {
+    const STATES = new Set('AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC'.split(' '));
+    for (const m of src.slice(0, 400).matchAll(/\b[A-Z][A-Za-z.]+(?: [A-Z][A-Za-z.]+)*,\s*([A-Z]{2})\b/g)) {
+      if (STATES.has(m[1])) {
+        out.push({ label: 'Location / onsite', excerpt: m[0], tip: 'No remote/hybrid language found — this reads as onsite. Confirm the commute works before investing time.' });
+        break;
+      }
+    }
   }
   return out;
 }
@@ -1758,7 +1823,7 @@ function renderBookmarklet() {
     zone.innerHTML = '<p style="margin:0;">Run the app via <code>Start ResumeForge.command</code> to enable the browser button.</p>';
     return;
   }
-  const src = `(function(){var s=window.getSelection().toString();var el=document.querySelector('#jobDescriptionText,.jobs-description__content,.description__text,.jobsearch-JobComponent-description,[class*="jobDescription"]');var t=(s&&s.length>200)?s:(el?el.innerText:document.body.innerText);t=t.slice(0,30000);fetch('${location.origin}/api/clip',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({title:document.title,url:location.href,text:t})}).then(function(){alert('Sent to ResumeForge \\u2713')}).catch(function(){alert('ResumeForge is not running. Start it, then try again.')})})()`;
+  const src = `(function(){var s=window.getSelection().toString();var el=document.querySelector('#jobDescriptionText,.jobs-description__content,.description__text,.jobsearch-JobComponent-description,[class*="jobDescription"]');var t=(s&&s.length>200)?s:(el?el.innerText:document.body.innerText);t=t.slice(0,30000);if(/[\\uD800-\\uDBFF]$/.test(t))t=t.slice(0,-1);fetch('${location.origin}/api/clip',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({title:document.title,url:location.href,text:t})}).then(function(){alert('Sent to ResumeForge \\u2713')}).catch(function(){alert('ResumeForge is not running. Start it, then try again.')})})()`;
   zone.innerHTML = `
     <p style="margin-top:0;"><strong>One-time setup:</strong> drag this button to your browser's bookmarks bar:</p>
     <p><a id="bm-link" class="btn primary" style="text-decoration:none;">📋 Grade in ResumeForge</a></p>
@@ -1776,9 +1841,9 @@ function ageBadge(posted) {
   return `<span class="status-badge status-saved" style="opacity:.7;">${Math.round(days / 7)}w old — may be filled</span>`;
 }
 
-function quickGrade(description) {
+function quickGrade(description, title = '') {
   if ((description || '').trim().length < 300) return null; // snippets grade unreliably
-  const kws = extractKeywords(description);
+  const kws = extractKeywords(description, title);
   if (!kws.length) return null;
   const res = scoreResume('master', kws);
   return res ? res.score : null;
@@ -1802,7 +1867,7 @@ async function runSearch() {
       return d.results || [];
     } catch (e) { errors.push(`${s.name}: ${e.message}`); return []; }
   }));
-  searchResults = settled.flat().map(r => ({ ...r, match: quickGrade((r.title ? r.title + '\n' : '') + (r.description || '')) }));
+  searchResults = settled.flat().map(r => ({ ...r, match: quickGrade(r.description, r.title) }));
   searchResults.sort((a, b) => (b.match ?? -1) - (a.match ?? -1));
   renderSearchResults(errors);
 }
@@ -1834,7 +1899,7 @@ function createJobFrom({ title, company, jd, url }) {
     status: 'saved', dateApplied: '', notes: '', coverLetter: '',
     createdAt: new Date().toISOString(), tailored: makeTailored(), analysis: null
   };
-  if ((jd || '').trim().length >= 60) job.analysis = { keywords: extractKeywords((job.title ? job.title + '\n' : '') + jd), at: new Date().toISOString() };
+  if ((jd || '').trim().length >= 60) job.analysis = { keywords: extractKeywords(jd, title), at: new Date().toISOString() };
   state.jobs.unshift(job);
   state.ui.selectedJob = job.id;
   save();
@@ -1900,7 +1965,7 @@ document.addEventListener('input', e => {
     const job = state.jobs.find(j => j.id === t.dataset.job);
     if (job) {
       job[t.dataset.f] = t.value;
-      if (t.dataset.f === 'jd' && job.analysis) job.analysis.stale = true;
+      if ((t.dataset.f === 'jd' || t.dataset.f === 'title') && job.analysis) job.analysis.stale = true;
       if (t.dataset.f === 'title' || t.dataset.f === 'company' || t.dataset.f === 'status') renderJobList();
       if (t.dataset.f === 'status' && t.value === 'applied' && !job.dateApplied) job.dateApplied = new Date().toISOString().slice(0, 10);
     }
@@ -2034,7 +2099,7 @@ document.addEventListener('click', e => {
     const job = state.jobs.find(j => j.id === el.dataset.id);
     if (!job) return;
     if ((job.jd || '').trim().length < 60) { toast('Paste the full job posting first — the more text, the better the analysis.'); return; }
-    const kws = extractKeywords((job.title ? job.title + '\n' : '') + job.jd);
+    const kws = extractKeywords(job.jd, job.title);
     if (!kws.length) { job.analysis = null; save(); renderJobs(); toast('⚠ No keywords found — paste the complete posting text and try again'); return; }
     job.analysis = { keywords: kws, at: new Date().toISOString() };
     save(); renderJobs();
@@ -2113,11 +2178,11 @@ document.addEventListener('click', e => {
   else if (a === 'import-json') document.getElementById('import-file').click();
 });
 
-// Native Ctrl/Cmd+P prints the resume too, not a blank page.
+// Native Ctrl/Cmd+P prints the CURRENT resume — always regenerate, never stale.
 addEventListener('beforeprint', () => {
-  const pa = document.getElementById('print-area');
-  if (!pa.innerHTML.trim()) pa.innerHTML = resumeHTML(state.ui.previewTarget);
+  document.getElementById('print-area').innerHTML = resumeHTML(state.ui.previewTarget);
 });
+addEventListener('afterprint', () => { document.getElementById('print-area').innerHTML = ''; });
 
 /* ================================================================
    INIT
